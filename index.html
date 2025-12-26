@@ -18,7 +18,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
         :root {
             --ios-bg: #F5F5F7;
             --ios-glass: rgba(255, 255, 255, 0.85);
@@ -46,7 +45,8 @@
             filter: blur(60px); z-index: -1;
             animation: float 10s ease-in-out infinite alternate;
         }
-        @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(30px, 30px); } }
+        @keyframes float { 0% { transform: translate(0, 0);
+            } 100% { transform: translate(30px, 30px); } }
 
         /* Apple 风格组件 */
         .glass-panel {
@@ -69,7 +69,8 @@
 
         /* 输入框优化 */
         .input-ios {
-            font-size: 16px; /* 防止 iOS 自动放大 */
+            font-size: 16px;
+            /* 防止 iOS 自动放大 */
             transition: all 0.3s ease;
             appearance: none;
         }
@@ -84,8 +85,10 @@
 
         /* 底部抽屉动画 */
         @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+            from { transform: translateY(100%);
+            }
+            to { transform: translateY(0);
+            }
         }
         .drawer-enter {
             animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -101,7 +104,41 @@
             -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent);
         }
 
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        ::-webkit-scrollbar { width: 0px; background: transparent;
+        }
+
+        /* 回到顶部按钮样式 */
+        .back-to-top {
+            position: fixed;
+            bottom: calc(20px + var(--safe-bottom));
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+            color: #007AFF;
+            opacity: 0;
+            transform: translateY(20px) scale(0.9);
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .back-to-top.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        .back-to-top:active {
+            transform: scale(0.9);
+            background: #f0f0f0;
+        }
     </style>
 </head>
 
@@ -112,10 +149,17 @@
     <div id="app" class="flex-1 w-full max-w-3xl mx-auto px-5 py-4 safe-pb relative z-10">
         </div>
 
+    <button id="backToTop" onclick="scrollToTop()" class="back-to-top" aria-label="回到顶部">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+    </button>
+
     <div id="settingsModal" class="fixed inset-0 bg-black/30 backdrop-blur-md z-50 hidden flex items-end md:items-center justify-center transition-opacity duration-300" style="z-index: 9999;">
         <div class="absolute inset-0" onclick="closeSettings()"></div>
         
-        <div class="drawer-enter bg-[#F9F9F9]/95 backdrop-blur-xl w-full md:w-[400px] md:rounded-[2rem] rounded-t-[2rem] shadow-2xl p-6 space-y-6 relative z-10 border-t border-white/50 md:border-none pb-[max(25px,env(safe-area-inset-bottom))]">
+        <div class="drawer-enter bg-[#F9F9F9]/95 backdrop-blur-xl w-full md:w-[400px] md:rounded-[2rem] rounded-t-[2rem] shadow-2xl p-6 space-y-6 relative z-10 border-t border-white/50 
+        md:border-none pb-[max(25px,env(safe-area-inset-bottom))]">
             <div class="w-10 h-1.5 bg-slate-300 rounded-full mx-auto md:hidden mb-2"></div>
             
             <div class="text-center space-y-1">
@@ -132,7 +176,7 @@
                 </div>
                 <div class="space-y-1.5">
                     <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">Admin Key</label>
-                    <input id="setKey" type="password" placeholder="••••••••" 
+                    <input id="setKey" type="password" placeholder="••••••••" autocomplete="new-password"
                         class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium">
                 </div>
             </div>
@@ -144,16 +188,32 @@
     </div>
 
     <script>
+        // --- 工具函数：HTML 转义（防止 XSS） ---
+        function escapeHtml(text) {
+            if (text == null) return "";
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         // --- 核心配置 ---
         const urlParams = new URLSearchParams(window.location.search);
         const shareId = urlParams.get('share');
         
-        let storedApi = localStorage.getItem('cf_notes_api') || "";
-        let ADMIN_KEY = localStorage.getItem('cf_notes_key') || "";
+        let storedApi = "";
+        let ADMIN_KEY = "";
         
-        // [安全] 闭包缓存，防止全局污染
-        let _PRIVATE_MEM_CACHE = []; 
+        // [修复] Storage 访问添加 try-catch 保护
+        try {
+            storedApi = localStorage.getItem('cf_notes_api') || "";
+            ADMIN_KEY = localStorage.getItem('cf_notes_key') || "";
+        } catch(e) { console.warn("Storage access restricted"); }
 
+        // [安全] 闭包缓存，防止全局污染
+        let _PRIVATE_MEM_CACHE = [];
         if (storedApi.endsWith('/')) {
             storedApi = storedApi.slice(0, -1);
         }
@@ -195,6 +255,22 @@
         function init() {
             if (shareId) renderShareView();
             else renderMainView();
+            
+            // 监听滚动以显示回到顶部按钮
+            window.addEventListener('scroll', () => {
+                const btn = document.getElementById('backToTop');
+                if (window.scrollY > 300) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
+        }
+
+        // 回到顶部功能
+        function scrollToTop() {
+            if(navigator.vibrate) navigator.vibrate(5);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function renderMainView() {
@@ -205,8 +281,10 @@
                         <h1 class="text-2xl font-bold text-slate-900 tracking-tight">CloudNotes</h1>
                         <p class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Encrypted Vault</p>
                     </div>
-                    <button onclick="configUrl()" class="w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-500 shadow-sm border border-white flex items-center justify-center btn-ios active:bg-slate-100">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <button onclick="configUrl()" class="w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-500 shadow-sm border border-white flex items-center justify-center btn-ios 
+                    active:bg-slate-100">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 
+                        2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
                 </header>
 
@@ -267,15 +345,17 @@
                         <h1 class="text-2xl font-bold text-slate-900">阅后即焚</h1>
                         <p class="text-slate-500 text-sm mt-1">数据将在解密后立即物理销毁</p>
                     </div>
-                    
+        
                     <input id="sharePw" type="password" placeholder="输入解密密码" inputmode="numeric"
                         class="w-full bg-white p-4 rounded-2xl outline-none text-center font-bold text-lg border border-slate-100 input-ios focus:ring-2 ring-orange-500/20">
 
-                    <button id="unlockBtn" onclick="doUnlockShare()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-500/20 btn-ios text-lg active:scale-95">
+                    <button id="unlockBtn" onclick="doUnlockShare()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white 
+                    py-4 rounded-2xl font-bold shadow-lg shadow-orange-500/20 btn-ios text-lg active:scale-95">
                         立即解密
                     </button>
                     
-                    <div id="shareResult" class="mt-6 text-left p-5 bg-slate-50 rounded-2xl hidden whitespace-pre-wrap text-sm leading-relaxed border border-slate-200 text-slate-700 font-mono break-words"></div>
+                    <div id="shareResult" class="mt-6 text-left p-5 bg-slate-50 rounded-2xl hidden whitespace-pre-wrap 
+                    text-sm leading-relaxed border border-slate-200 text-slate-700 font-mono break-words"></div>
                 </div>
             </div>
         `;
@@ -298,8 +378,11 @@
             let newApi = document.getElementById('setApi').value.trim();
             if (newApi.endsWith('/')) newApi = newApi.slice(0, -1);
             
-            localStorage.setItem('cf_notes_api', newApi);
-            localStorage.setItem('cf_notes_key', document.getElementById('setKey').value);
+            try {
+                localStorage.setItem('cf_notes_api', newApi);
+                localStorage.setItem('cf_notes_key', document.getElementById('setKey').value);
+            } catch(e) { alert("设置无法保存（隐身模式限制）"); }
+            
             location.reload();
         }
 
@@ -307,10 +390,8 @@
             const text = document.getElementById('noteInput').value;
             const pw = document.getElementById('mainPw').value;
             if (!text || !pw) return alert("请填写内容和密码");
-            
             // 简单震动反馈
             if(navigator.vibrate) navigator.vibrate(10);
-
             try {
                 const cipher = await encrypt(text, pw);
                 const res = await fetch(`${API_URL}/api/save`, {
@@ -318,11 +399,13 @@
                     body: JSON.stringify({ content: cipher })
                 });
                 if (res.ok) { 
-                    alert("✅ 已加密存入"); 
+                    alert("✅ 已加密存入");
                     document.getElementById('noteInput').value = ""; 
                     loadList(); 
-                } else { alert("❌ 保存失败：请检查 Key 或网络"); }
-            } catch (e) { alert("❌ 网络异常：" + e.message); }
+                } else { alert("❌ 保存失败：请检查 Key 或网络");
+                }
+            } catch (e) { alert("❌ 网络异常：" + e.message);
+            }
         }
 
         async function loadList() {
@@ -331,10 +414,8 @@
             
             const listDiv = document.getElementById('notesList');
             const searchBar = document.getElementById('searchBar');
-            
             // 触觉反馈
             if(navigator.vibrate) navigator.vibrate(5);
-            
             listDiv.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm animate-pulse">正在同步并解密...</div>';
             
             try {
@@ -342,10 +423,8 @@
                 const notes = await res.json(); 
                 
                 if (notes.error) throw new Error(notes.error);
-                
                 // [安全] 清空并重建内存索引，不使用全局变量
                 _PRIVATE_MEM_CACHE = [];
-                
                 for (let n of notes) {
                     const clearText = await decrypt(n.content, pw);
                     if (clearText) {
@@ -354,7 +433,6 @@
                 }
 
                 renderNotesToDom(_PRIVATE_MEM_CACHE);
-
                 if (_PRIVATE_MEM_CACHE.length > 0) {
                     searchBar.classList.remove('hidden');
                 } else {
@@ -363,7 +441,7 @@
 
             } catch (e) { 
                 console.error(e);
-                listDiv.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">连接失败：' + e.message + '</div>';
+                listDiv.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">连接失败：' + escapeHtml(e.message) + '</div>';
             }
         }
 
@@ -382,49 +460,50 @@
 
             notesArray.forEach(n => {
                 const card = document.createElement('div');
-                card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden animate-in fade-in zoom-in duration-300";
+                card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden animate-in fade-in zoom-in duration-300 group";
                 
                 // 判断内容是否过长 (超过150字 或 超过4行)
                 const isLong = n.clearText.length > 150 || (n.clearText.match(/\n/g) || []).length > 3;
                 
+                // [安全] 使用 escapeHtml 转义 ID 和时间
+                const safeId = escapeHtml(n.id);
+                const safeDate = escapeHtml(new Date(n.created_at).toLocaleDateString() + ' ' + new Date(n.created_at).toLocaleTimeString().slice(0,5));
+
                 const headerHtml = `
                     <div class="flex justify-between items-center opacity-60">
-                        <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${n.id}</span>
-                        <span class="text-[10px] font-medium text-slate-400">${new Date(n.created_at).toLocaleDateString()} ${new Date(n.created_at).toLocaleTimeString().slice(0,5)}</span>
+                        <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${safeId}</span>
+                        <span class="text-[10px] font-medium text-slate-400">${safeDate}</span>
                     </div>
                 `;
-                
+               
                 // [安全] 使用 textContent 防止 XSS
                 const contentWrapper = document.createElement('div');
-                
-                // 内容 div
                 const contentDiv = document.createElement('div');
-                contentDiv.id = `content-${n.id}`;
+                contentDiv.id = `content-${safeId}`;
                 contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700 ${isLong ? 'line-clamp-custom' : ''}`;
                 contentDiv.textContent = n.clearText; 
 
                 contentWrapper.appendChild(contentDiv);
-
                 // 展开按钮
                 if (isLong) {
-                    const btnHtml = `<button onclick="toggleExpand(${n.id})" id="btn-${n.id}" class="mt-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity">展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg></button>`;
+                    const btnHtml = `<button onclick="toggleExpand(${safeId})" id="btn-${safeId}" class="mt-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity">展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg></button>`;
                     contentWrapper.insertAdjacentHTML('beforeend', btnHtml);
                 }
 
+                // [安全修复] 传递 ID 而不是 密文(content) 到 HTML 属性中，防止 XSS 和 属性截断
                 const footerHtml = `
                     <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
-                        <button onclick="doShareCopy('${n.content}')" class="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 active:scale-95 btn-ios transition">
+                        <button onclick="doShareCopy(${safeId})" class="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 active:scale-95 btn-ios transition">
                             📤 分享
                         </button>
                         <button class="export-btn flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 active:scale-95 btn-ios transition">
                             💾 备份
                         </button>
-                        <button onclick="doDelete(${n.id})" class="flex-1 py-2.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:bg-red-100 active:scale-95 btn-ios transition">
+                        <button onclick="doDelete(${safeId})" class="flex-1 py-2.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:bg-red-100 active:scale-95 btn-ios transition">
                             🗑️ 删除
                         </button>
                     </div>
                 `;
-
                 card.innerHTML = headerHtml;
                 card.appendChild(contentWrapper);
                 card.insertAdjacentHTML('beforeend', footerHtml);
@@ -455,7 +534,7 @@
             doSearch();
         }
 
-        // 折叠/展开逻辑
+        // 折叠/展开逻辑 [优化：收起时自动回滚]
         function toggleExpand(id) {
             const contentDiv = document.getElementById(`content-${id}`);
             const btn = document.getElementById(`btn-${id}`);
@@ -472,10 +551,23 @@
                 contentDiv.style.maskImage = '';
                 contentDiv.style.webkitMaskImage = '';
                 btn.innerHTML = `展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`;
+                
+                // [优化] 收起时平滑滚动回卡片顶部，防止长文收起后视线丢失
+                const card = btn.closest('.bg-white');
+                if (card) {
+                    const offset = card.getBoundingClientRect().top + window.pageYOffset - 100;
+                    window.scrollTo({ top: offset, behavior: 'smooth' });
+                }
             }
         }
 
-        async function doShareCopy(cipher) {
+        // [安全修复] 现在通过 ID 查找内容，而不是从 HTML 属性中读取密文
+        async function doShareCopy(id) {
+            // 在内存缓存中查找对应的笔记
+            const note = _PRIVATE_MEM_CACHE.find(n => n.id == id);
+            if (!note) return alert("笔记未找到");
+            const cipher = note.content;
+
             const pid = Math.random().toString(36).substring(2, 12);
             if(navigator.vibrate) navigator.vibrate(10);
             try {
@@ -491,7 +583,8 @@
                 } else {
                     prompt("🔥 阅后即焚链接：", fullUrl);
                 }
-            } catch (e) { alert("生成失败"); }
+            } catch (e) { alert("生成失败");
+            }
         }
 
         function doExport(text, id) {
@@ -529,8 +622,10 @@
                 const data = await res.json();
                 document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
                 if(navigator.vibrate) navigator.vibrate(20);
-            } catch(e) { alert("AI 服务出错或网络不可达"); } 
-            finally { btn.innerHTML = oldHtml; btn.disabled = false; }
+            } catch(e) { alert("AI 服务出错或网络不可达");
+            } 
+            finally { btn.innerHTML = oldHtml;
+            btn.disabled = false; }
         }
 
         async function doUnlockShare() {
@@ -538,12 +633,13 @@
             const resDiv = document.getElementById('shareResult');
             const btn = document.getElementById('unlockBtn');
             try {
-                const res = await fetch(`${API_URL}/api/share/${shareId}`);
+                // [安全修复] 对 shareId 进行编码，防止 URL 注入
+                const res = await fetch(`${API_URL}/api/share/${encodeURIComponent(shareId)}`);
                 if (!res.ok) return alert("链接已失效或网络错误");
                 const data = await res.json(); 
                 const clearText = await decrypt(data.content, pw);
                 if (clearText) { 
-                    resDiv.textContent = clearText; 
+                    resDiv.textContent = clearText;
                     resDiv.classList.remove('hidden'); 
                     btn.disabled = true; btn.className = "w-full bg-slate-200 text-slate-400 py-4 rounded-2xl font-bold"; btn.innerText = "数据已销毁";
                 } else alert("密码错误");
