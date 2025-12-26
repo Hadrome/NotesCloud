@@ -539,7 +539,7 @@
         async function doAI() {
             const text = document.getElementById('noteInput').value;
             if (!text) return alert("笔记为空");
-            if(!confirm("⚠️ 隐私警告：\nAI 总结需将前 1000 字符【明文】发送至服务器。是否继续？")) return;
+            if(!confirm("⚠️ 隐私警告：\nAI总结需将内容【明文】发送至服务器。是否继续？")) return;
 
             const btn = event.target.closest('button'); 
             const oldHtml = btn.innerHTML;
@@ -549,7 +549,7 @@
             try {
                 const promptContent = "请用中文总结以下内容：\n" + text.substring(0, 1000);
                 
-                // 【修复核心】同时发送 prompt 和 text，以兼容不同的 Worker 后端写法
+                // 同时发送 prompt 和 text，以兼容不同的 Worker 后端写法
                 const payload = {
                     prompt: promptContent, 
                     text: promptContent,
