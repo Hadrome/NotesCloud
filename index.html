@@ -30,10 +30,9 @@
             font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
             background-color: var(--ios-bg);
             color: #1d1d1f;
-            -webkit-tap-highlight-color: transparent; /* 移除点击高亮色块 */
+            -webkit-tap-highlight-color: transparent;
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
-            /* 适配刘海屏顶部 */
             padding-top: max(20px, var(--safe-top)); 
         }
 
@@ -57,7 +56,6 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.04);
         }
 
-        /* 触摸反馈动画 (Active instead of Hover on Mobile) */
         .btn-ios {
             transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s;
         }
@@ -66,23 +64,22 @@
             opacity: 0.8;
         }
 
-        /* 输入框优化：防止 iOS 缩放 (font-size >= 16px) */
+        /* 输入框优化 */
         .input-ios {
             font-size: 16px; 
             transition: all 0.3s ease;
-            appearance: none; /* 移除原生样式 */
+            appearance: none;
         }
         .input-ios:focus {
             background: #fff;
             box-shadow: 0 0 0 4px rgba(0,122,255,0.15);
         }
 
-        /* 底部安全区垫片 */
         .safe-pb {
             padding-bottom: calc(2rem + var(--safe-bottom));
         }
 
-        /* 移动端底部抽屉动画 */
+        /* 底部抽屉动画 */
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
@@ -91,7 +88,6 @@
             animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        /* 隐藏滚动条 */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
@@ -134,7 +130,7 @@
     </div>
 
     <script>
-        // --- 核心逻辑 (安全加密保持不变) ---
+        // --- 核心逻辑 ---
         const urlParams = new URLSearchParams(window.location.search);
         const shareId = urlParams.get('share');
         
@@ -172,7 +168,7 @@
             } catch (e) { return null; }
         }
 
-        // --- 移动端优化视图 ---
+        // --- 视图渲染 ---
 
         function init() {
             if (shareId) renderShareView();
@@ -197,7 +193,6 @@
                         开始配置
                     </button>
                 </div>
-                <p class="mt-8 text-[10px] text-slate-400 font-medium uppercase tracking-widest">Secure Local Encryption</p>
             </div>
         `;
         }
@@ -240,7 +235,7 @@
                     <div id="notesList" class="grid gap-3 pb-8">
                         <div class="text-center py-12">
                             <div class="inline-block p-4 rounded-full bg-white/50 mb-2 text-2xl">☁️</div>
-                            <p class="text-slate-400 text-sm">输入密钥后刷新查看</p>
+                            <p class="text-slate-400 text-sm">输入密钥后刷新，只显示匹配的笔记</p>
                         </div>
                     </div>
                 </section>
@@ -276,7 +271,6 @@
         function configUrl() {
             const modal = document.getElementById('settingsModal');
             modal.classList.remove('hidden');
-            // 小延迟让 CSS transition 生效
             setTimeout(() => {
                 document.getElementById('setApi').value = API_URL;
                 document.getElementById('setKey').value = ADMIN_KEY;
@@ -309,28 +303,35 @@
             } catch (e) { alert("❌ 网络异常"); }
         }
 
+        // [重点修改] 列表加载逻辑：自动过滤非己方密码的消息
         async function loadList() {
             const pw = document.getElementById('mainPw').value;
-            if (!pw) return alert("请输入主密钥以解密保险库");
+            if (!pw) return alert("请输入主密钥以筛选您的笔记");
+            
             const listDiv = document.getElementById('notesList');
-            listDiv.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm animate-pulse">正在同步数据...</div>';
+            listDiv.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm animate-pulse">正在同步并解密...</div>';
             
             try {
                 const res = await fetch(`${API_URL}/api/list`, { headers: { 'Authorization': ADMIN_KEY } });
                 const notes = await res.json(); 
                 listDiv.innerHTML = "";
                 
-                if (notes.length === 0) listDiv.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm">暂无加密笔记</div>';
-                
-                for (let n of notes) {
-                    const clearText = await decrypt(n.content, pw);
-                    const displayText = clearText || "🔒 解密失败：密码错误";
-                    const isError = !clearText;
+                // 1. 先统计能解密的数量
+                let visibleCount = 0;
 
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden";
+                for (let n of notes) {
+                    // 尝试解密
+                    const clearText = await decrypt(n.content, pw);
                     
-                    // Card Header
+                    // [过滤核心] 如果解密结果为 null (即密码不匹配)，直接跳过，不渲染
+                    if (!clearText) continue; 
+                    
+                    visibleCount++;
+
+                    // 渲染卡片 (仅渲染解密成功的)
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden animate-in fade-in zoom-in duration-300";
+                    
                     const headerHtml = `
                         <div class="flex justify-between items-center opacity-60">
                             <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${n.id}</span>
@@ -338,12 +339,10 @@
                         </div>
                     `;
                     
-                    // Content
                     const contentDiv = document.createElement('div');
-                    contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words ${isError ? 'text-red-500' : 'text-slate-700'}`;
-                    contentDiv.textContent = displayText;
+                    contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700`;
+                    contentDiv.textContent = clearText;
 
-                    // Footer Buttons (增大触控区域)
                     const footerHtml = `
                         <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
                             <button onclick="doShareCopy('${n.content}')" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 transition">
@@ -362,9 +361,22 @@
                     card.appendChild(contentDiv);
                     card.insertAdjacentHTML('beforeend', footerHtml);
                     
-                    card.querySelector('.export-btn').onclick = () => doExport(displayText, n.id);
+                    card.querySelector('.export-btn').onclick = () => doExport(clearText, n.id);
                     listDiv.appendChild(card);
                 }
+
+                // 2. 如果服务器有数据，但没有一条能解开，提示用户
+                if (notes.length > 0 && visibleCount === 0) {
+                    listDiv.innerHTML = `
+                        <div class="text-center py-12 space-y-2">
+                            <div class="text-3xl">📭</div>
+                            <p class="text-slate-500 text-sm font-bold">未找到匹配笔记</p>
+                            <p class="text-slate-400 text-xs">当前密码无法解密服务器上的任何记录</p>
+                        </div>`;
+                } else if (notes.length === 0) {
+                    listDiv.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm">暂无数据</div>';
+                }
+
             } catch (e) { 
                 console.error(e);
                 listDiv.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">连接失败，请检查配置</div>';
@@ -379,7 +391,6 @@
                     body: JSON.stringify({ content: cipher, public_id: pid, is_share: 1 })
                 });
                 const fullUrl = `${window.location.origin}${window.location.pathname}?share=${pid}`;
-                // 使用 Clipboard API 尝试复制，如果不行则 Prompt
                 if (navigator.share) {
                     navigator.share({ title: '阅后即焚链接', url: fullUrl }).catch(() => prompt("链接：", fullUrl));
                 } else {
