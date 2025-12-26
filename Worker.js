@@ -5,7 +5,7 @@ export default {
     
     // --- CORS 配置 (允许跨域) ---
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // 为了安全，生产环境可以将 * 改为你的前端域名
+      "Access-Control-Allow-Origin": "*", 
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
@@ -15,7 +15,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // --- 鉴权辅助函数 ---
+    // --- 【核心修改】鉴权辅助函数 ---
     const checkAuth = (req) => {
       const auth = req.headers.get("Authorization");
       
