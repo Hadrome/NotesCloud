@@ -48,13 +48,13 @@
             <div class="w-10 h-1.5 bg-slate-300 rounded-full mx-auto md:hidden mb-2"></div>
             <div class="text-center space-y-1">
                 <h2 class="text-lg font-bold text-slate-900">系统设置</h2>
-                <p class="text-xs text-slate-500">连接您的 Worker 后端</p>
+                <p class="text-xs text-slate-500">连接 Worker 后端</p>
             </div>
             <div class="space-y-4">
                 <div class="space-y-1.5">
                     <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">API Endpoint</label>
                     <input id="setApi" type="url" placeholder="https://..." inputmode="url" class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium placeholder:text-slate-400">
-                    <p class="text-[10px] text-slate-400 ml-1">请输入完整的 Worker 地址</p>
+                    <p class="text-[10px] text-slate-400 ml-1">输入完整的 Worker 地址</p>
                 </div>
                 <div class="space-y-1.5">
                     <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">Admin Key</label>
@@ -69,18 +69,15 @@
     </div>
 
     <script>
-        // --- Utilities & Config ---
-        const vibrate = (pattern) => navigator.vibrate && navigator.vibrate(pattern);
-        function escapeHtml(text) {
-            if (text == null) return "";
-            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-        }
-        function yieldToMain() { return new Promise(resolve => setTimeout(resolve, 0)); }
+        // --- Utils ---
+        const vibrate = (p) => navigator.vibrate && navigator.vibrate(p);
+        function escapeHtml(t) { return t == null ? "" : String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+        function yieldToMain() { return new Promise(r => setTimeout(r, 0)); }
 
+        // --- Config ---
         const urlParams = new URLSearchParams(window.location.search);
         const shareId = urlParams.get('share');
-        let storedApi = "";
-        let ADMIN_KEY = "";
+        let storedApi = "", ADMIN_KEY = "";
 
         try {
             storedApi = localStorage.getItem('cf_notes_api') || "";
@@ -95,7 +92,7 @@
         let API_URL = storedApi;
         const app = document.getElementById('app');
 
-        // --- Crypto Logic ---
+        // --- Crypto ---
         async function getK(pw, salt) {
             const enc = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pw), { name: "PBKDF2" }, false, ["deriveKey"]);
@@ -114,17 +111,15 @@
         async function decrypt(json, pw) {
             try {
                 const parsed = JSON.parse(atob(json));
-                if (!parsed.salt) throw new Error("Invalid format");
-                const iv = new Uint8Array(parsed.iv);
-                const salt = new Uint8Array(parsed.salt);
-                const data = new Uint8Array(parsed.data);
+                if (!parsed.salt) throw new Error("Format Err");
+                const iv = new Uint8Array(parsed.iv), salt = new Uint8Array(parsed.salt), data = new Uint8Array(parsed.data);
                 const key = await getK(pw, salt);
                 const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
                 return new TextDecoder().decode(dec);
             } catch (e) { return null; }
         }
 
-        // --- Core Application ---
+        // --- Init ---
         function init() {
             shareId ? renderShareView() : renderMainView();
             let ticking = false;
@@ -146,6 +141,7 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // --- Views ---
         function renderMainView() {
             app.innerHTML = `
             <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
@@ -166,10 +162,9 @@
 
                 <main class="glass-panel p-5 rounded-[1.8rem] space-y-4 shadow-sm w-full">
                     <input id="mainPw" type="password" placeholder="输入主密钥 (Passkey)" autocomplete="current-password" class="w-full bg-white/60 border border-white p-4 rounded-xl outline-none input-ios text-slate-800 placeholder:text-slate-400 transition-colors focus:bg-white focus:ring-2 focus:ring-blue-500/10">
-                    
                     <div id="writeModeArea" class="hidden-mode space-y-4">
                          <textarea id="noteInput" placeholder="在此输入需要加密的内容..." class="w-full bg-white/60 border border-white p-4 h-36 rounded-xl outline-none input-ios resize-none text-slate-800 leading-relaxed placeholder:text-slate-400 transition-colors focus:bg-white focus:ring-2 focus:ring-blue-500/10"></textarea>
-                         <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-2 gap-3">
                             <button onclick="doSave()" class="bg-slate-900 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 btn-ios flex items-center justify-center gap-2 active:scale-95">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                                 <span>加密存储</span>
@@ -178,11 +173,11 @@
                                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
                                 <span>AI 总结</span>
                             </button>
-                      </div>
+                        </div>
                     </div>
 
                     <div id="readModeArea" class="mode-section pt-2">
-                       <button onclick="loadList()" id="decryptBtn" class="w-full bg-blue-500/10 text-blue-600 border border-blue-100 py-4 rounded-xl font-bold text-sm btn-ios flex items-center justify-center gap-2 active:bg-blue-100 active:scale-95">
+                        <button onclick="loadList()" id="decryptBtn" class="w-full bg-blue-500/10 text-blue-600 border border-blue-100 py-4 rounded-xl font-bold text-sm btn-ios flex items-center justify-center gap-2 active:bg-blue-100 active:scale-95">
                             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
                             <span>解密查看笔记</span>
                         </button>
@@ -233,18 +228,13 @@
             </div>`;
         }
 
-        // --- Interaction Logic ---
+        // --- Logic ---
         function toggleWriteMode() {
-            const writeArea = document.getElementById('writeModeArea');
-            const readArea = document.getElementById('readModeArea');
-            if (writeArea.classList.contains('hidden-mode')) {
-                writeArea.classList.remove('hidden-mode');
-                readArea.classList.add('hidden-mode');
-                vibrate(10);
-            } else {
-                writeArea.classList.add('hidden-mode');
-                readArea.classList.remove('hidden-mode');
-            }
+            const w = document.getElementById('writeModeArea'), r = document.getElementById('readModeArea');
+            const hidden = w.classList.contains('hidden-mode');
+            w.classList.toggle('hidden-mode', !hidden);
+            r.classList.toggle('hidden-mode', hidden);
+            vibrate(10);
         }
         
         function configUrl() {
@@ -255,23 +245,21 @@
             }, 10);
         }
 
-        function closeSettings() { 
-            document.getElementById('settingsModal').classList.add('hidden');
-        }
+        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
 
         function saveSettings() {
-            let newApi = document.getElementById('setApi').value.trim();
-            if (newApi.endsWith('/')) newApi = newApi.slice(0, -1);
+            let api = document.getElementById('setApi').value.trim();
+            if (api.endsWith('/')) api = api.slice(0, -1);
             try {
-                localStorage.setItem('cf_notes_api', newApi);
+                localStorage.setItem('cf_notes_api', api);
                 localStorage.setItem('cf_notes_key', document.getElementById('setKey').value.trim()); 
-            } catch(e) { alert("设置无法保存（隐私模式限制）"); }
+            } catch(e) { alert("设置保存失败：本地存储受限"); }
             location.reload();
         }
 
         async function doSave() {
-            const text = document.getElementById('noteInput').value;
-            const pw = document.getElementById('mainPw').value;
+            const text = document.getElementById('noteInput').value.trim();
+            const pw = ADMIN_KEY || document.getElementById('mainPw').value.trim();
             if (!text || !pw) return alert("请填写内容和密码");
             vibrate(10);
             try {
@@ -286,233 +274,194 @@
                     toggleWriteMode(); 
                     loadList();
                 } else { 
-                    const errData = await res.json().catch(() => ({}));
-                    alert("❌ 保存失败：" + (errData.error || "请检查 Key 或网络"));
+                    const err = await res.json().catch(() => ({}));
+                    alert("❌ 保存失败：" + (err.error || "请检查网络或 Key"));
                 }
             } catch (e) { alert("❌ 网络异常：" + e.message); }
         }
 
         async function loadList() {
-            const pw = document.getElementById('mainPw').value;
-            if (!pw) return alert("请输入主密钥以筛选您的笔记");
+            const pw = ADMIN_KEY || document.getElementById('mainPw').value.trim();
+            if (!pw) return alert("请输入主密钥以查看笔记");
             
-            const listDiv = document.getElementById('notesList');
-            const searchBar = document.getElementById('searchBar');
-            const decryptBtn = document.getElementById('decryptBtn');
-            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            const listDiv = document.getElementById('notesList'), btn = document.getElementById('decryptBtn');
+            const loadMore = document.getElementById('loadMoreContainer');
             vibrate(5);
             
-            const originalBtnText = decryptBtn.innerHTML;
-            decryptBtn.innerHTML = `<span class="animate-spin inline-block"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></span> <span>处理中...</span>`;
-            decryptBtn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span class="animate-spin inline-block"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></span> <span>处理中...</span>`;
+            btn.disabled = true;
             
             listDiv.className = "grid grid-cols-1 gap-4 pb-2 items-start";
-            listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm animate-pulse">正在下载数据...</div>';
-            loadMoreContainer.classList.add('hidden');
-            
+            listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm animate-pulse">正在同步数据...</div>';
+            loadMore.classList.add('hidden');
+
             try {
                 const res = await fetch(`${API_URL}/api/list`, { headers: { 'Authorization': ADMIN_KEY } });
                 const notes = await res.json(); 
                 if (notes.error) throw new Error(notes.error);
                 
-                listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm animate-pulse">正在解密...</div>';
+                listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400 text-sm animate-pulse">正在解密保险箱...</div>';
                 _PRIVATE_MEM_CACHE = [];
                 _RENDERED_COUNT = 0;
 
                 let count = 0;
                 for (let n of notes) {
                     const clearText = await decrypt(n.content, pw);
-                    if (clearText) _PRIVATE_MEM_CACHE.push({ ...n, clearText: clearText });
+                    if (clearText) _PRIVATE_MEM_CACHE.push({ ...n, clearText });
                     count++;
                     if (count % 10 === 0) await yieldToMain();
                 }
 
                 renderNotesToDom(_PRIVATE_MEM_CACHE.slice(0, _PAGE_SIZE));
                 _RENDERED_COUNT = _PAGE_SIZE;
-                searchBar.classList.toggle('hidden', _PRIVATE_MEM_CACHE.length === 0);
+                document.getElementById('searchBar').classList.toggle('hidden', _PRIVATE_MEM_CACHE.length === 0);
             } catch (e) { 
-                console.error(e);
-                listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-red-400 text-sm">连接失败：' + escapeHtml(e.message) + '</div>';
+                listDiv.innerHTML = '<div class="col-span-full text-center py-8 text-red-400 text-sm">连接错误：' + escapeHtml(e.message) + '</div>';
             } finally {
-                decryptBtn.innerHTML = originalBtnText;
-                decryptBtn.disabled = false;
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         }
 
-        function renderNotesToDom(notesArray, append = false) {
-            const listDiv = document.getElementById('notesList');
-            const loadMoreContainer = document.getElementById('loadMoreContainer');
-            
-            if (!append) listDiv.innerHTML = "";
-            loadMoreContainer.innerHTML = "";
-            
-            if (notesArray.length === 0 && !append) {
-                listDiv.innerHTML = `
-                    <div class="col-span-full text-center py-12 space-y-2">
-                        <div class="text-3xl opacity-30">
-                            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mx-auto"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
-                        </div>
-                        <p class="text-slate-500 text-sm font-bold">无匹配数据</p>
-                    </div>`;
-                loadMoreContainer.classList.add('hidden');
+        function renderNotesToDom(list, append = false) {
+            const div = document.getElementById('notesList'), more = document.getElementById('loadMoreContainer');
+            if (!append) div.innerHTML = "";
+            more.innerHTML = "";
+
+            if (list.length === 0 && !append) {
+                div.innerHTML = `<div class="col-span-full text-center py-12 space-y-2"><div class="text-3xl opacity-30"><svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mx-auto"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg></div><p class="text-slate-500 text-sm font-bold">无匹配数据</p></div>`;
+                more.classList.add('hidden');
                 return;
             }
 
-            listDiv.classList.remove('md:grid-cols-2');
-            listDiv.classList.add('grid-cols-1');
+            div.classList.remove('md:grid-cols-2');
+            div.classList.add('grid-cols-1');
 
-            const fragment = document.createDocumentFragment();
-            notesArray.forEach(n => {
+            const frag = document.createDocumentFragment();
+            list.forEach(n => {
                 const card = document.createElement('div');
                 card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden animate-in fade-in zoom-in duration-300 group h-full";
                 
                 const isLong = n.clearText.length > 150 || (n.clearText.match(/\n/g) || []).length > 3;
                 const safeId = escapeHtml(n.id);
-                const safeDate = escapeHtml(new Date(n.created_at).toLocaleDateString() + ' ' + new Date(n.created_at).toLocaleTimeString().slice(0,5));
+                const dt = new Date(n.created_at);
+                const safeDate = escapeHtml(`${dt.toLocaleDateString()} ${dt.toLocaleTimeString().slice(0,5)}`);
 
-                const headerHtml = `
+                card.innerHTML = `
                     <div class="flex justify-between items-center opacity-60">
                         <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${safeId}</span>
                         <span class="text-[10px] font-medium text-slate-400">${safeDate}</span>
                     </div>`;
                 
-                const contentWrapper = document.createElement('div');
-                contentWrapper.className = "flex-1";
-                if (isLong) {
-                    contentWrapper.insertAdjacentHTML('beforeend', `<button onclick="toggleExpand(${safeId})" id="btn-top-${safeId}" class="mb-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity hidden w-full justify-start btn-ios">收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg></button>`);
-                }
+                const wrap = document.createElement('div');
+                wrap.className = "flex-1";
+                if (isLong) wrap.insertAdjacentHTML('beforeend', `<button onclick="toggleExpand(${safeId})" id="btn-top-${safeId}" class="mb-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity hidden w-full justify-start btn-ios">收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg></button>`);
 
-                const contentDiv = document.createElement('div');
-                contentDiv.id = `content-${safeId}`;
-                contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700 ${isLong ? 'line-clamp-custom' : ''}`;
-                contentDiv.textContent = n.clearText; 
+                const content = document.createElement('div');
+                content.id = `content-${safeId}`;
+                content.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700 ${isLong ? 'line-clamp-custom' : ''}`;
+                content.textContent = n.clearText; // Safe: textContent handles escaping
+                wrap.appendChild(content);
 
-                contentWrapper.appendChild(contentDiv);
-                if (isLong) {
-                    contentWrapper.insertAdjacentHTML('beforeend', `<button onclick="toggleExpand(${safeId})" id="btn-${safeId}" class="mt-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity btn-ios">展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg></button>`);
-                }
+                if (isLong) wrap.insertAdjacentHTML('beforeend', `<button onclick="toggleExpand(${safeId})" id="btn-${safeId}" class="mt-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity btn-ios">展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg></button>`);
 
-                const footerHtml = `
+                card.appendChild(wrap);
+                card.insertAdjacentHTML('beforeend', `
                     <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
-                        <button onclick="doShareCopy(${safeId})" class="flex-1 py-2.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold active:bg-rose-100 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5" title="阅后即焚">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.048 8.287 8.287 0 0 0 9 9.6a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48z"></path></svg> 阅后即焚
-                        </button>
-                        <button class="export-btn flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 备份
-                        </button>
-                        <button onclick="doDelete(${safeId})" class="flex-1 py-2.5 bg-slate-100 text-slate-500 rounded-lg text-xs font-bold active:bg-slate-200 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> 删除
-                        </button>
-                    </div>`;
+                        <button onclick="doShareCopy(${safeId})" class="flex-1 py-2.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold active:bg-rose-100 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5" title="阅后即焚"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.048 8.287 8.287 0 0 0 9 9.6a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48z"></path></svg> 阅后即焚</button>
+                        <button class="export-btn flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 备份</button>
+                        <button onclick="doDelete(${safeId})" class="flex-1 py-2.5 bg-slate-100 text-slate-500 rounded-lg text-xs font-bold active:bg-slate-200 active:scale-95 btn-ios transition flex items-center justify-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> 删除</button>
+                    </div>`);
                 
-                card.innerHTML = headerHtml;
-                card.appendChild(contentWrapper);
-                card.insertAdjacentHTML('beforeend', footerHtml);
                 card.querySelector('.export-btn').onclick = () => doExport(n.clearText, n.id);
-                fragment.appendChild(card);
+                frag.appendChild(card);
             });
-            listDiv.appendChild(fragment);
+            div.appendChild(frag);
 
-            const isSearchMode = document.getElementById('searchInput').value.length > 0;
-            const currentDisplayedCount = append ? (_RENDERED_COUNT) : notesArray.length;
-            if (!isSearchMode && currentDisplayedCount < _PRIVATE_MEM_CACHE.length) {
-                const moreBtn = document.createElement('button');
-                moreBtn.id = 'loadMoreBtn';
-                moreBtn.className = 'load-more-btn btn-ios hover:bg-slate-50 transition-colors';
-                moreBtn.innerText = '加载更多';
-                moreBtn.onclick = loadMoreNotes;
-                loadMoreContainer.appendChild(moreBtn);
-                loadMoreContainer.classList.remove('hidden');
+            const searchMode = document.getElementById('searchInput').value.length > 0;
+            const shown = append ? _RENDERED_COUNT : list.length;
+            
+            if (!searchMode && shown < _PRIVATE_MEM_CACHE.length) {
+                const btn = document.createElement('button');
+                btn.className = 'load-more-btn btn-ios hover:bg-slate-50 transition-colors';
+                btn.innerText = '加载更多';
+                btn.onclick = loadMoreNotes;
+                more.appendChild(btn);
+                more.classList.remove('hidden');
             } else {
-                loadMoreContainer.classList.add('hidden');
+                more.classList.add('hidden');
             }
         }
 
         function loadMoreNotes() {
-            const nextBatch = _PRIVATE_MEM_CACHE.slice(_RENDERED_COUNT, _RENDERED_COUNT + _PAGE_SIZE);
-            if (nextBatch.length > 0) {
-                _RENDERED_COUNT += nextBatch.length;
-                renderNotesToDom(nextBatch, true);
+            const next = _PRIVATE_MEM_CACHE.slice(_RENDERED_COUNT, _RENDERED_COUNT + _PAGE_SIZE);
+            if (next.length > 0) {
+                _RENDERED_COUNT += next.length;
+                renderNotesToDom(next, true);
             }
         }
 
         function doSearch() {
-            const input = document.getElementById('searchInput');
-            const clearBtn = document.getElementById('clearSearchBtn');
-            const query = input.value.toLowerCase();
-            
-            clearBtn.classList.toggle('hidden', query.length === 0);
-            const filtered = _PRIVATE_MEM_CACHE.filter(n => n.clearText.toLowerCase().includes(query));
-            renderNotesToDom(filtered);
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            document.getElementById('clearSearchBtn').classList.toggle('hidden', q.length === 0);
+            renderNotesToDom(_PRIVATE_MEM_CACHE.filter(n => n.clearText.toLowerCase().includes(q)));
         }
 
         function clearSearch() {
-            const input = document.getElementById('searchInput');
-            input.value = "";
-            input.focus();
+            const inp = document.getElementById('searchInput');
+            inp.value = ""; inp.focus();
             _RENDERED_COUNT = 0;
-            renderNotesToDom([], false); 
-            
-            const firstPage = _PRIVATE_MEM_CACHE.slice(0, _PAGE_SIZE);
-            if (firstPage.length > 0) {
-                _RENDERED_COUNT = firstPage.length;
-                renderNotesToDom(firstPage, false);
+            renderNotesToDom([], false);
+            const p1 = _PRIVATE_MEM_CACHE.slice(0, _PAGE_SIZE);
+            if (p1.length > 0) {
+                _RENDERED_COUNT = p1.length;
+                renderNotesToDom(p1, false);
             }
         }
 
         function toggleExpand(id) {
-            const contentDiv = document.getElementById(`content-${id}`);
-            const btn = document.getElementById(`btn-${id}`);
-            const btnTop = document.getElementById(`btn-top-${id}`);
+            const div = document.getElementById(`content-${id}`);
+            const btn = document.getElementById(`btn-${id}`), btnTop = document.getElementById(`btn-top-${id}`);
+            const isC = div.classList.contains('line-clamp-custom');
             
-            if (contentDiv.classList.contains('line-clamp-custom')) {
-                contentDiv.classList.remove('line-clamp-custom');
-                contentDiv.style.maskImage = 'none';
-                contentDiv.style.webkitMaskImage = 'none';
-                btn.innerHTML = `收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg>`;
-                if(btnTop) btnTop.classList.remove('hidden');
-            } else {
-                contentDiv.classList.add('line-clamp-custom');
-                contentDiv.style.maskImage = '';
-                contentDiv.style.webkitMaskImage = '';
-                btn.innerHTML = `展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`;
-                if(btnTop) btnTop.classList.add('hidden');
-                
+            div.classList.toggle('line-clamp-custom');
+            div.style.maskImage = isC ? 'none' : '';
+            div.style.webkitMaskImage = isC ? 'none' : '';
+            
+            btn.innerHTML = isC ? `收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg>` 
+                                : `展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`;
+            if (btnTop) btnTop.classList.toggle('hidden', !isC);
+
+            if (!isC) {
                 const card = btn.closest('.bg-white');
-                if (card) {
-                    const offset = card.getBoundingClientRect().top + window.pageYOffset - 80;
-                    window.scrollTo({ top: offset, behavior: 'smooth' });
-                }
+                if (card) window.scrollTo({ top: card.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
             }
         }
 
         async function doShareCopy(id) {
             const note = _PRIVATE_MEM_CACHE.find(n => n.id == id);
             if (!note) return alert("笔记未找到");
-            const cipher = note.content;
+            
             const pid = Math.random().toString(36).substring(2, 12);
             vibrate(10);
             try {
                 const res = await fetch(`${API_URL}/api/save`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ content: cipher, public_id: pid, is_share: 1 })
+                    body: JSON.stringify({ content: note.content, public_id: pid, is_share: 1 })
                 });
                 if(!res.ok) throw new Error("API Error");
                 
-                const fullUrl = `${window.location.origin}${window.location.pathname}?share=${pid}`;
-                if (navigator.share) {
-                    navigator.share({ title: '阅后即焚链接', url: fullUrl }).catch(() => prompt("链接：", fullUrl));
-                } else {
-                    prompt("🔥 阅后即焚链接：", fullUrl);
-                }
+                const url = `${window.location.origin}${window.location.pathname}?share=${pid}`;
+                if (navigator.share) navigator.share({ title: '阅后即焚', url: url }).catch(() => prompt("链接：", url));
+                else prompt("🔥 阅后即焚链接：", url);
             } catch (e) { alert("生成失败"); }
         }
 
         function doExport(text, id) {
             vibrate(10);
-            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
             a.download = `Note_${id}.txt`; a.click();
         }
 
@@ -527,46 +476,62 @@
         }
 
         async function doAI() {
-            const text = document.getElementById('noteInput').value;
+            const text = document.getElementById('noteInput').value.trim();
+            // FIX: 优先读取本地存储Key，如果为空则读取输入框Key（与doSave逻辑一致）
+            const pw = ADMIN_KEY || document.getElementById('mainPw').value.trim();
+            
             if (!text) return alert("笔记为空");
-            if(!confirm("⚠️ 隐私警告：\nAI总结需将内容【明文】发送至服务器。是否继续？")) return;
+            if (!pw) return alert("请输入主密钥 (Admin Key)");
 
-            const btn = event.target.closest('button'); 
+            if(!confirm("⚠️ 隐私警告：\n内容将【明文】发送至服务器进行摘要。")) return;
+
+            const btn = event.target.closest('button');
             const oldHtml = btn.innerHTML;
             btn.innerHTML = `<span class="animate-spin inline-block"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></span>`;
             btn.disabled = true;
             
             try {
-                const prompt = "请用中文总结以下内容：\n" + text.substring(0, 1000);
                 const res = await fetch(`${API_URL}/api/ai-sum`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ text: prompt })
+                    method: 'POST', 
+                    // FIX: 使用 pw 变量鉴权
+                    headers: { 'Content-Type': 'application/json', 'Authorization': pw },
+                    body: JSON.stringify({ text: "请用中文总结：\n" + text.substring(0, 1000) })
                 });
+                
+                // FIX: 增加状态检查
+                if (!res.ok) throw new Error("请求失败 " + res.status);
+
                 const data = await res.json();
-                document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
-                vibrate(20);
-            } catch(e) { alert("AI 服务出错或网络不可达");
+                
+                // FIX: 增加字段检查，防止 undefined
+                if (data.summary) {
+                    document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
+                    vibrate(20);
+                } else {
+                    throw new Error("返回数据格式错误 (无 summary)");
+                }
+            } catch(e) { 
+                alert("AI 服务错误：" + e.message); 
             } finally { 
-                btn.innerHTML = oldHtml;
+                btn.innerHTML = oldHtml; 
                 btn.disabled = false; 
             }
         }
 
         async function doUnlockShare() {
-            const pw = document.getElementById('sharePw').value;
-            const resDiv = document.getElementById('shareResult');
-            const btn = document.getElementById('unlockBtn');
+            const pw = document.getElementById('sharePw').value.trim();
+            const resDiv = document.getElementById('shareResult'), btn = document.getElementById('unlockBtn');
             try {
                 const res = await fetch(`${API_URL}/api/share/${encodeURIComponent(shareId)}`);
-                if (!res.ok) return alert("链接已失效或网络错误");
+                if (!res.ok) return alert("链接已失效");
                 const data = await res.json(); 
-                const clearText = await decrypt(data.content, pw);
-                if (clearText) { 
-                    resDiv.textContent = clearText;
+                const text = await decrypt(data.content, pw);
+                if (text) { 
+                    resDiv.textContent = text;
                     resDiv.classList.remove('hidden'); 
                     btn.disabled = true; btn.className = "w-full bg-slate-200 text-slate-400 py-4 rounded-2xl font-bold"; btn.innerText = "数据已销毁";
                 } else alert("密码错误");
-            } catch (e) { alert("网络错误，请检查连接"); }
+            } catch (e) { alert("网络错误"); }
         }
 
         init();
