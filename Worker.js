@@ -1,450 +1,123 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
     
-    <title>CloudNotes</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="theme-color" content="#F5F5F7">
-    
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
+    // --- CORS 配置 (允许跨域) ---
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*", // 为了安全，生产环境可以将 * 改为你的前端域名
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    };
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    // 处理预检请求 (Browser Preflight)
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
 
-        :root {
-            --ios-bg: #F5F5F7;
-            --ios-glass: rgba(255, 255, 255, 0.85);
-            --safe-bottom: env(safe-area-inset-bottom);
-            --safe-top: env(safe-area-inset-top);
+    // 鉴权辅助函数
+    const checkAuth = (req) => {
+      const auth = req.headers.get("Authorization");
+      // 简单比对 Admin Key
+      return auth === env.ADMIN_KEY;
+    };
+
+    // 通用响应辅助函数
+    const jsonResponse = (data, status = 200) => {
+      return new Response(JSON.stringify(data), {
+        status: status,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders // 每个响应都带上 CORS 头
         }
+      });
+    };
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
-            background-color: var(--ios-bg);
-            color: #1d1d1f;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-font-smoothing: antialiased;
-            overflow-x: hidden;
-            padding-top: max(20px, var(--safe-top)); 
-        }
+    try {
+      // --- API 路由 ---
 
-        /* 动态背景 */
-        .ambient-light {
-            position: fixed;
-            top: -20%; left: -10%; width: 120vw; height: 120vw;
-            background: radial-gradient(circle, rgba(0,122,255,0.12) 0%, rgba(0,0,0,0) 70%);
-            filter: blur(60px); z-index: -1;
-            animation: float 10s ease-in-out infinite alternate;
-        }
-
-        @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(30px, 30px); } }
-
-        /* Apple 风格组件 */
-        .glass-panel {
-            background: var(--ios-glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.6);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.04);
-        }
-
-        .btn-ios {
-            transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s;
-        }
-        .btn-ios:active {
-            transform: scale(0.96);
-            opacity: 0.8;
-        }
-
-        /* 输入框优化 */
-        .input-ios {
-            font-size: 16px; 
-            transition: all 0.3s ease;
-            appearance: none;
-        }
-        .input-ios:focus {
-            background: #fff;
-            box-shadow: 0 0 0 4px rgba(0,122,255,0.15);
-        }
-
-        .safe-pb {
-            padding-bottom: calc(2rem + var(--safe-bottom));
-        }
-
-        /* 底部抽屉动画 */
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-        .drawer-enter {
-            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-    </style>
-</head>
-
-<body class="selection:bg-blue-500/20 selection:text-blue-700 min-h-screen flex flex-col">
-    
-    <div class="ambient-light"></div>
-
-    <div id="app" class="flex-1 w-full max-w-3xl mx-auto px-5 py-4 safe-pb relative z-10">
-        </div>
-
-    <div id="settingsModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 hidden flex items-end md:items-center justify-center transition-opacity duration-300">
-        <div class="absolute inset-0" onclick="closeSettings()"></div>
+      // 1. 保存笔记 (POST /api/save)
+      if (path === "/api/save" && request.method === "POST") {
+        if (!checkAuth(request)) return jsonResponse({ error: "Unauthorized" }, 401);
         
-        <div class="drawer-enter bg-[#F9F9F9]/95 backdrop-blur-xl w-full md:w-[400px] md:rounded-[2rem] rounded-t-[2rem] shadow-2xl p-6 space-y-6 relative z-10 border-t border-white/50 md:border-none pb-[max(20px,env(safe-area-inset-bottom))]">
-            <div class="w-10 h-1.5 bg-slate-300 rounded-full mx-auto md:hidden mb-2"></div>
-            
-            <div class="text-center space-y-1">
-                <h2 class="text-lg font-bold text-slate-900">系统设置</h2>
-                <p class="text-xs text-slate-500">连接您的 Worker 后端</p>
-            </div>
-
-            <div class="space-y-4">
-                <div class="space-y-1.5">
-                    <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">API Endpoint</label>
-                    <input id="setApi" type="url" placeholder="留空自动适配当前域名" 
-                        class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium placeholder:text-slate-400">
-                    <p class="text-[10px] text-slate-400 ml-1">若绑定了自定义域名，建议留空以解决网络问题。</p>
-                </div>
-                <div class="space-y-1.5">
-                    <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">Admin Key</label>
-                    <input id="setKey" type="password" placeholder="••••••••" 
-                        class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium">
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3 pt-2">
-                <button onclick="closeSettings()" class="py-3.5 bg-slate-200/80 text-slate-600 font-bold rounded-xl btn-ios text-sm">取消</button>
-                <button onclick="saveSettings()" class="py-3.5 bg-[#007AFF] text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 btn-ios text-sm">保存</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // --- 核心配置与智能网络修复 ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const shareId = urlParams.get('share');
+        const body = await request.json();
+        const isShare = body.is_share ? 1 : 0;
+        const publicId = body.public_id || null;
         
-        let storedApi = localStorage.getItem('cf_notes_api') || "";
-        let ADMIN_KEY = localStorage.getItem('cf_notes_key') || "";
+        await env.DB.prepare(
+          "INSERT INTO notes (content, is_share, public_id) VALUES (?, ?, ?)"
+        ).bind(body.content, isShare, publicId).run();
 
-        // [智能修复逻辑] 
-        // 如果当前是在自定义域名下访问，且配置中残留了 workers.dev 的地址（会导致国内访问网络错误），
-        // 则强制清空 API 配置，使其回退到相对路径（即使用当前自定义域名），从而无需 VPN 即可直连。
-        if (window.location.hostname !== 'localhost' && storedApi.includes('workers.dev')) {
-            console.log("Auto-fixing API endpoint to relative path for connectivity.");
-            storedApi = ""; 
-        }
+        return jsonResponse({ success: true });
+      }
 
-        let API_URL = storedApi;
+      // 2. 获取列表 (GET /api/list)
+      if (path === "/api/list" && request.method === "GET") {
+        if (!checkAuth(request)) return jsonResponse({ error: "Unauthorized" }, 401);
 
-        const app = document.getElementById('app');
+        const { results } = await env.DB.prepare(
+          "SELECT id, content, created_at FROM notes WHERE is_share = 0 ORDER BY id DESC"
+        ).all();
 
-        // --- 加密模块 (PBKDF2 + AES-GCM) ---
-        async function getK(pw, salt) {
-            const enc = new TextEncoder();
-            const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pw), { name: "PBKDF2" }, false, ["deriveKey"]);
-            return await crypto.subtle.deriveKey({ name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" }, keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-        }
+        return jsonResponse(results);
+      }
 
-        async function encrypt(text, pw) {
-            const enc = new TextEncoder();
-            const salt = crypto.getRandomValues(new Uint8Array(16));
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-            const key = await getK(pw, salt);
-            const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
-            return btoa(JSON.stringify({ iv: Array.from(iv), salt: Array.from(salt), data: Array.from(new Uint8Array(cipher)) }));
-        }
-
-        async function decrypt(json, pw) {
-            try {
-                const parsed = JSON.parse(atob(json));
-                if (!parsed.salt) throw new Error("Legacy");
-                const iv = new Uint8Array(parsed.iv);
-                const salt = new Uint8Array(parsed.salt);
-                const data = new Uint8Array(parsed.data);
-                const key = await getK(pw, salt);
-                const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
-                return new TextDecoder().decode(dec);
-            } catch (e) { return null; }
-        }
-
-        // --- 视图逻辑 ---
-
-        function init() {
-            if (shareId) renderShareView();
-            else renderMainView(); // 默认进入主视图，无需判断 API 是否为空，空即代表相对路径
-        }
-
-        function renderMainView() {
-            app.innerHTML = `
-            <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <header class="flex justify-between items-center pt-2 sticky top-0 z-20 mix-blend-hard-light">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">CloudNotes</h1>
-                        <p class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Encrypted Vault</p>
-                    </div>
-                    <button onclick="configUrl()" class="w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-500 shadow-sm border border-white flex items-center justify-center btn-ios">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                    </button>
-                </header>
-
-                <main class="glass-panel p-5 rounded-[1.8rem] space-y-4 shadow-sm">
-                    <input id="mainPw" type="password" placeholder="输入主密钥 (Passkey)" autocomplete="current-password"
-                        class="w-full bg-white/60 border border-white p-4 rounded-xl outline-none input-ios text-slate-800 placeholder:text-slate-400 transition-colors focus:bg-white">
-                    
-                    <textarea id="noteInput" placeholder="在此输入需要加密的内容..." 
-                        class="w-full bg-white/60 border border-white p-4 h-36 rounded-xl outline-none input-ios resize-none text-slate-800 leading-relaxed placeholder:text-slate-400 transition-colors focus:bg-white"></textarea>
-                    
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="doSave()" class="bg-slate-900 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 btn-ios flex items-center justify-center gap-2">
-                            <span>🔒</span> 加密存储
-                        </button>
-                        <button onclick="doAI()" class="bg-white text-indigo-600 border border-indigo-100 py-4 rounded-xl font-bold text-sm btn-ios flex items-center justify-center gap-2">
-                            <span>✨</span> AI 总结
-                        </button>
-                    </div>
-                </main>
-
-                <section class="space-y-4 pt-2">
-                    <div class="flex justify-between items-center px-2">
-                        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">Notes Vault</h2>
-                        <button onclick="loadList()" class="bg-blue-50 px-3 py-1.5 rounded-lg text-[#007AFF] text-xs font-bold btn-ios active:bg-blue-100">刷新列表</button>
-                    </div>
-                    <div id="notesList" class="grid gap-3 pb-8">
-                        <div class="text-center py-12">
-                            <div class="inline-block p-4 rounded-full bg-white/50 mb-2 text-2xl">☁️</div>
-                            <p class="text-slate-400 text-sm">输入主密钥后刷新<br>仅显示匹配的加密笔记</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        `;
-        }
-
-        function renderShareView() {
-            app.innerHTML = `
-            <div class="min-h-[80vh] flex flex-col justify-center px-2">
-                <div class="glass-panel p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center space-y-6 animate-in zoom-in duration-500">
-                    <div class="w-20 h-20 bg-orange-500 rounded-full mx-auto flex items-center justify-center text-4xl shadow-lg shadow-orange-500/30">🔥</div>
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-900">阅后即焚</h1>
-                        <p class="text-slate-500 text-sm mt-1">数据将在解密后立即物理销毁</p>
-                    </div>
-                    
-                    <input id="sharePw" type="password" placeholder="输入解密密码" inputmode="numeric"
-                        class="w-full bg-white p-4 rounded-2xl outline-none text-center font-bold text-lg border border-slate-100 input-ios focus:ring-2 ring-orange-500/20">
-
-                    <button id="unlockBtn" onclick="doUnlockShare()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-500/20 btn-ios text-lg">
-                        立即解密
-                    </button>
-                    
-                    <div id="shareResult" class="mt-6 text-left p-5 bg-slate-50 rounded-2xl hidden whitespace-pre-wrap text-sm leading-relaxed border border-slate-200 text-slate-700 font-mono break-words"></div>
-                </div>
-            </div>
-        `;
-        }
-
-        /* --- 交互逻辑 --- */
+      // 3. 删除笔记 (POST /api/delete)
+      if (path === "/api/delete" && request.method === "POST") {
+        if (!checkAuth(request)) return jsonResponse({ error: "Unauthorized" }, 401);
         
-        function configUrl() {
-            const modal = document.getElementById('settingsModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                document.getElementById('setApi').value = storedApi; // 显示当前存储的配置
-                document.getElementById('setKey').value = ADMIN_KEY;
-            }, 10);
-        }
-        function closeSettings() { 
-            document.getElementById('settingsModal').classList.add('hidden');
-        }
-        function saveSettings() {
-            // 保存配置
-            const newApi = document.getElementById('setApi').value.trim();
-            localStorage.setItem('cf_notes_api', newApi);
-            localStorage.setItem('cf_notes_key', document.getElementById('setKey').value);
-            location.reload();
-        }
+        const body = await request.json();
+        await env.DB.prepare("DELETE FROM notes WHERE id = ?").bind(body.id).run();
+        
+        return jsonResponse({ success: true });
+      }
 
-        async function doSave() {
-            const text = document.getElementById('noteInput').value;
-            const pw = document.getElementById('mainPw').value;
-            if (!text || !pw) return alert("请填写内容和密码");
-            try {
-                const cipher = await encrypt(text, pw);
-                const res = await fetch(`${API_URL}/api/save`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ content: cipher })
-                });
-                if (res.ok) { 
-                    alert("✅ 已加密存入"); 
-                    document.getElementById('noteInput').value = ""; 
-                    loadList(); 
-                } else { alert("❌ 保存失败：密钥或网络错误"); }
-            } catch (e) { alert("❌ 网络异常：请检查网络或配置"); }
-        }
+      // 4. AI 总结 (POST /api/ai-sum)
+      if (path === "/api/ai-sum" && request.method === "POST") {
+        if (!checkAuth(request)) return jsonResponse({ error: "Unauthorized" }, 401);
 
-        // [过滤功能] 仅显示当前密码能解密的笔记
-        async function loadList() {
-            const pw = document.getElementById('mainPw').value;
-            if (!pw) return alert("请输入主密钥以筛选您的笔记");
-            
-            const listDiv = document.getElementById('notesList');
-            listDiv.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm animate-pulse">正在同步并解密...</div>';
-            
-            try {
-                // 如果 API_URL 为空，fetch 会自动请求相对路径，适配自定义域名
-                const res = await fetch(`${API_URL}/api/list`, { headers: { 'Authorization': ADMIN_KEY } });
-                const notes = await res.json(); 
-                listDiv.innerHTML = "";
-                
-                let visibleCount = 0;
+        const body = await request.json();
+        const text = body.text;
 
-                for (let n of notes) {
-                    const clearText = await decrypt(n.content, pw);
-                    
-                    // 如果解密失败（密码不匹配），跳过渲染
-                    if (!clearText) continue; 
-                    
-                    visibleCount++;
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden animate-in fade-in zoom-in duration-300";
-                    
-                    const headerHtml = `
-                        <div class="flex justify-between items-center opacity-60">
-                            <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${n.id}</span>
-                            <span class="text-[10px] font-medium text-slate-400">${new Date(n.created_at).toLocaleDateString()} ${new Date(n.created_at).toLocaleTimeString().slice(0,5)}</span>
-                        </div>
-                    `;
-                    
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700`;
-                    contentDiv.textContent = clearText;
+        // 调用 Workers AI (使用 Qwen 1.5)
+        const aiRes = await env.AI.run('@cf/qwen/qwen1.5-7b-chat-awq', {
+          messages: [
+            { role: "system", content: "你是一个专业的笔记助手。请用中文简明扼要地总结用户的笔记内容，提取核心要点。" },
+            { role: "user", content: text }
+          ]
+        });
 
-                    const footerHtml = `
-                        <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
-                            <button onclick="doShareCopy('${n.content}')" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 transition">
-                                📤 分享
-                            </button>
-                            <button class="export-btn flex-1 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 transition">
-                                💾 备份
-                            </button>
-                            <button onclick="doDelete(${n.id})" class="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:bg-red-100 transition">
-                                🗑️ 删除
-                            </button>
-                        </div>
-                    `;
+        return jsonResponse({ summary: aiRes.response });
+      }
 
-                    card.innerHTML = headerHtml;
-                    card.appendChild(contentDiv);
-                    card.insertAdjacentHTML('beforeend', footerHtml);
-                    
-                    card.querySelector('.export-btn').onclick = () => doExport(clearText, n.id);
-                    listDiv.appendChild(card);
-                }
+      // 5. 阅后即焚获取 (GET /api/share/:id)
+      const shareMatch = path.match(/^\/api\/share\/([a-zA-Z0-9]+)$/);
+      if (shareMatch && request.method === "GET") {
+        const shareId = shareMatch[1];
+        
+        const note = await env.DB.prepare(
+          "SELECT * FROM notes WHERE public_id = ? AND is_share = 1"
+        ).bind(shareId).first();
 
-                if (notes.length > 0 && visibleCount === 0) {
-                    listDiv.innerHTML = `
-                        <div class="text-center py-12 space-y-2">
-                            <div class="text-3xl">📭</div>
-                            <p class="text-slate-500 text-sm font-bold">未找到匹配笔记</p>
-                            <p class="text-slate-400 text-xs">当前密码无法解密云端的任何记录</p>
-                        </div>`;
-                } else if (notes.length === 0) {
-                    listDiv.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm">暂无数据</div>';
-                }
-
-            } catch (e) { 
-                console.error(e);
-                listDiv.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">连接失败，请检查配置或网络</div>';
-            }
+        if (!note) {
+          return jsonResponse({ error: "Not found or expired" }, 404);
         }
 
-        async function doShareCopy(cipher) {
-            const pid = Math.random().toString(36).substring(2, 12);
-            try {
-                await fetch(`${API_URL}/api/save`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ content: cipher, public_id: pid, is_share: 1 })
-                });
-                const fullUrl = `${window.location.origin}${window.location.pathname}?share=${pid}`;
-                if (navigator.share) {
-                    navigator.share({ title: '阅后即焚链接', url: fullUrl }).catch(() => prompt("链接：", fullUrl));
-                } else {
-                    prompt("🔥 阅后即焚链接：", fullUrl);
-                }
-            } catch (e) { alert("生成失败"); }
-        }
+        // 读取后立即物理删除
+        await env.DB.prepare("DELETE FROM notes WHERE id = ?").bind(note.id).run();
 
-        function doExport(text, id) {
-            const date = new Date().toISOString().split('T')[0];
-            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url;
-            a.download = `Note_${id}.txt`; a.click();
-        }
+        return jsonResponse({ content: note.content });
+      }
 
-        async function doDelete(id) {
-            if (!confirm("⚠️ 确定永久删除？")) return;
-            await fetch(`${API_URL}/api/delete`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                body: JSON.stringify({ id: id })
-            });
-            loadList();
-        }
+      // 默认路由
+      if (path === "/") {
+        return new Response("CloudNotes API is running.", { status: 200, headers: corsHeaders });
+      }
 
-        async function doAI() {
-            const text = document.getElementById('noteInput').value;
-            if (!text) return alert("笔记为空");
-            if(!confirm("⚠️ 隐私警告：\nAI 总结需将前 1000 字符【明文】发送至服务器。是否继续？")) return;
+      return jsonResponse({ error: "Not Found" }, 404);
 
-            const btn = event.target; 
-            const oldHtml = btn.innerHTML;
-            btn.innerHTML = `<span class="animate-spin inline-block">⏳</span>`; btn.disabled = true;
-            
-            try {
-                const res = await fetch(`${API_URL}/api/ai-sum`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ text: text.substring(0, 1000) })
-                });
-                const data = await res.json();
-                document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
-            } catch(e) { alert("AI 服务出错或网络不可达"); } 
-            finally { btn.innerHTML = oldHtml; btn.disabled = false; }
-        }
-
-        async function doUnlockShare() {
-            const pw = document.getElementById('sharePw').value;
-            const resDiv = document.getElementById('shareResult');
-            const btn = document.getElementById('unlockBtn');
-            try {
-                const res = await fetch(`${API_URL}/api/share/${shareId}`);
-                if (!res.ok) return alert("链接已失效或网络错误");
-                const data = await res.json(); 
-                const clearText = await decrypt(data.content, pw);
-                if (clearText) { 
-                    resDiv.textContent = clearText; 
-                    resDiv.classList.remove('hidden'); 
-                    btn.disabled = true; btn.className = "w-full bg-slate-200 text-slate-400 py-4 rounded-2xl font-bold"; btn.innerText = "数据已销毁";
-                } else alert("密码错误");
-            } catch (e) { alert("网络错误，请检查连接"); }
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
-        }
-
-        init();
-    </script>
-</body>
-</html>
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+};
