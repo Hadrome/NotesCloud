@@ -5,7 +5,7 @@ export default {
     
     // --- CORS 配置 (允许跨域) ---
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // 生产环境建议指定具体域名
+      "Access-Control-Allow-Origin": "*", // 为了安全，生产环境可以将 * 改为你的前端域名
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
@@ -15,27 +15,20 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // --- 核心修改：支持多 Key 鉴权 ---
+    // --- 修改后的鉴权辅助函数 ---
     const checkAuth = (req) => {
       const auth = req.headers.get("Authorization");
-      if (!auth) return false;
-
-      // 1. 检查单个 Key (兼容旧配置)
-      if (env.ADMIN_KEY && auth === env.ADMIN_KEY) {
-        return true;
-      }
-
-      // 2. 检查多 Key (新配置，逗号分隔)
-      // 在 Cloudflare 环境变量中设置 ADMIN_KEYS = "key1,key2,key3"
-      if (env.ADMIN_KEYS) {
-        // 将配置字符串按逗号、分号或换行符分割，并去除首尾空格
-        const validKeys = env.ADMIN_KEYS.split(/[,;\n]+/).map(k => k.trim());
-        if (validKeys.includes(auth)) {
-          return true;
-        }
-      }
-
-      return false;
+      
+      // 1.以此确保环境变量存在
+      if (!env.ADMIN_KEY) return false;
+      
+      // 2. 将环境变量按逗号分割，并去除每个 Key 两端的空格
+      // 例如 "key1, key2" 变成 ["key1", "key2"]
+      const validKeys = env.ADMIN_KEY.split(',').map(k => k.trim());
+      
+      // 3. 检查前端发来的 auth 是否在这个数组里
+      // 注意：这里需要确保 auth 不为空
+      return auth && validKeys.includes(auth);
     };
 
     // 通用响应辅助函数
