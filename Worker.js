@@ -5,7 +5,7 @@ export default {
     
     // --- CORS 配置 (允许跨域) ---
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // 为了安全，生产环境可以将 * 改为你的前端域名
+      "Access-Control-Allow-Origin": "*", // 生产环境建议指定具体域名
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
@@ -15,11 +15,27 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // 鉴权辅助函数
+    // --- 核心修改：支持多 Key 鉴权 ---
     const checkAuth = (req) => {
       const auth = req.headers.get("Authorization");
-      // 简单比对 Admin Key
-      return auth === env.ADMIN_KEY;
+      if (!auth) return false;
+
+      // 1. 检查单个 Key (兼容旧配置)
+      if (env.ADMIN_KEY && auth === env.ADMIN_KEY) {
+        return true;
+      }
+
+      // 2. 检查多 Key (新配置，逗号分隔)
+      // 在 Cloudflare 环境变量中设置 ADMIN_KEYS = "key1,key2,key3"
+      if (env.ADMIN_KEYS) {
+        // 将配置字符串按逗号、分号或换行符分割，并去除首尾空格
+        const validKeys = env.ADMIN_KEYS.split(/[,;\n]+/).map(k => k.trim());
+        if (validKeys.includes(auth)) {
+          return true;
+        }
+      }
+
+      return false;
     };
 
     // 通用响应辅助函数
