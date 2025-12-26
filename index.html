@@ -328,7 +328,8 @@
                     <div id="notesList" class="grid gap-3 pb-8">
                         <div class="text-center py-12">
                             <div class="inline-block p-4 rounded-full bg-white/50 mb-2 text-2xl">☁️</div>
-                                     <p class="text-slate-400 text-s>输入主密钥后解密<br>仅显示匹配的加密笔记</p>                </div>
+                            <p class="text-slate-400 text-sm">输入主密钥后解密<br>仅显示匹配的加密笔记</p>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -477,6 +478,13 @@
                
                 // [安全] 使用 textContent 防止 XSS
                 const contentWrapper = document.createElement('div');
+                
+                // [新增] 如果内容过长，在内容上方添加一个隐藏的“收起”按钮
+                if (isLong) {
+                    const topBtnHtml = `<button onclick="toggleExpand(${safeId})" id="btn-top-${safeId}" class="mb-2 text-[11px] font-bold text-[#007AFF] hover:opacity-70 focus:outline-none flex items-center gap-1 active:opacity-50 transition-opacity hidden w-full justify-start">收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg></button>`;
+                    contentWrapper.insertAdjacentHTML('beforeend', topBtnHtml);
+                }
+
                 const contentDiv = document.createElement('div');
                 contentDiv.id = `content-${safeId}`;
                 contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words text-slate-700 ${isLong ? 'line-clamp-custom' : ''}`;
@@ -493,7 +501,7 @@
                 const footerHtml = `
                     <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
                         <button onclick="doShareCopy(${safeId})" class="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 active:scale-95 btn-ios transition">
-                            📤 阅后即焚
+                            📤 分享
                         </button>
                         <button class="export-btn flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 active:scale-95 btn-ios transition">
                             💾 备份
@@ -533,10 +541,12 @@
             doSearch();
         }
 
-        // 折叠/展开逻辑 [优化：收起时自动回滚]
+        // 折叠/展开逻辑 [优化：同步顶部按钮状态]
         function toggleExpand(id) {
             const contentDiv = document.getElementById(`content-${id}`);
             const btn = document.getElementById(`btn-${id}`);
+            // [新增] 获取顶部按钮
+            const btnTop = document.getElementById(`btn-top-${id}`);
             
             if (contentDiv.classList.contains('line-clamp-custom')) {
                 // 展开
@@ -544,13 +554,17 @@
                 contentDiv.style.maskImage = 'none';
                 contentDiv.style.webkitMaskImage = 'none';
                 btn.innerHTML = `收起 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transform: rotate(180deg)"><path d="M6 9l6 6 6-6"/></svg>`;
+                // [新增] 显示顶部按钮
+                if(btnTop) btnTop.classList.remove('hidden');
             } else {
                 // 收起
                 contentDiv.classList.add('line-clamp-custom');
                 contentDiv.style.maskImage = '';
                 contentDiv.style.webkitMaskImage = '';
                 btn.innerHTML = `展开全部 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`;
-                
+                // [新增] 隐藏顶部按钮
+                if(btnTop) btnTop.classList.add('hidden');
+
                 // [优化] 收起时平滑滚动回卡片顶部，防止长文收起后视线丢失
                 const card = btn.closest('.bg-white');
                 if (card) {
@@ -607,16 +621,19 @@
         async function doAI() {
             const text = document.getElementById('noteInput').value;
             if (!text) return alert("笔记为空");
-            if(!confirm("⚠️ 隐私警告：\nAI 总结需将前 1000 字符【明文】发送至服务器。是否继续？")) return;
+            if(!confirm("⚠️ 隐私警告：\nAI总结需将【明文内容】发送至服务器。是否继续？")) return;
 
             const btn = event.target; 
             const oldHtml = btn.innerHTML;
             btn.innerHTML = `<span class="animate-spin inline-block">⏳</span>`; btn.disabled = true;
             
             try {
+                // [修改] 添加提示词前缀，强制 AI 使用中文
+                const prompt = "请用中文总结以下内容：\n" + text.substring(0, 1000);
+                
                 const res = await fetch(`${API_URL}/api/ai-sum`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
-                    body: JSON.stringify({ text: text.substring(0, 1000) })
+                    body: JSON.stringify({ text: prompt })
                 });
                 const data = await res.json();
                 document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
