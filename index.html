@@ -3,120 +3,176 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudNotes | 2026 隐私加密笔记</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <title>CloudNotes</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#F5F5F7">
+    
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
-    <meta name="theme-color" content="#020617">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --ios-bg: #F5F5F7;
+            --ios-glass: rgba(255, 255, 255, 0.85);
+            --safe-bottom: env(safe-area-inset-bottom);
+            --safe-top: env(safe-area-inset-top);
+        }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #020617;
-            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+            background-color: var(--ios-bg);
+            color: #1d1d1f;
+            -webkit-tap-highlight-color: transparent; /* 移除点击高亮色块 */
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            /* 适配刘海屏顶部 */
+            padding-top: max(20px, var(--safe-top)); 
         }
 
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* 动态背景 */
+        .ambient-light {
+            position: fixed;
+            top: -20%; left: -10%; width: 120vw; height: 120vw;
+            background: radial-gradient(circle, rgba(0,122,255,0.12) 0%, rgba(0,0,0,0) 70%);
+            filter: blur(60px); z-index: -1;
+            animation: float 10s ease-in-out infinite alternate;
         }
 
-        .gradient-btn {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(30px, 30px); } }
+
+        /* Apple 风格组件 */
+        .glass-panel {
+            background: var(--ios-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.6);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.04);
         }
 
-        .gradient-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+        /* 触摸反馈动画 (Active instead of Hover on Mobile) */
+        .btn-ios {
+            transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s;
+        }
+        .btn-ios:active {
+            transform: scale(0.96);
+            opacity: 0.8;
         }
 
-        .note-card {
+        /* 输入框优化：防止 iOS 缩放 (font-size >= 16px) */
+        .input-ios {
+            font-size: 16px; 
             transition: all 0.3s ease;
+            appearance: none; /* 移除原生样式 */
+        }
+        .input-ios:focus {
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(0,122,255,0.15);
         }
 
-        .note-card:hover {
-            border-color: rgba(59, 130, 246, 0.5);
-            background: rgba(30, 41, 59, 0.9);
+        /* 底部安全区垫片 */
+        .safe-pb {
+            padding-bottom: calc(2rem + var(--safe-bottom));
         }
 
-        /* 隐藏滚动条但保留功能 */
-        ::-webkit-scrollbar {
-            width: 0px;
+        /* 移动端底部抽屉动画 */
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
         }
+        .drawer-enter {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 
-<body class="min-h-screen selection:bg-blue-500/30">
-    <div id="app" class="max-w-3xl mx-auto px-6 py-12 md:py-20">
-        <!-- 动态加载区 -->
-    </div>
+<body class="selection:bg-blue-500/20 selection:text-blue-700 min-h-screen flex flex-col">
+    
+    <div class="ambient-light"></div>
 
-    <!-- 极简设置弹窗 -->
-    <div id="settingsModal"
-        class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
-        <div class="glass w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl space-y-6">
-            <h2 class="text-2xl font-extrabold tracking-tight">⚙️ 系统配置</h2>
+    <div id="app" class="flex-1 w-full max-w-3xl mx-auto px-5 py-4 safe-pb relative z-10">
+        </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 hidden flex items-end md:items-center justify-center transition-opacity duration-300">
+        <div class="absolute inset-0" onclick="closeSettings()"></div>
+        
+        <div class="drawer-enter bg-[#F9F9F9]/95 backdrop-blur-xl w-full md:w-[400px] md:rounded-[2rem] rounded-t-[2rem] shadow-2xl p-6 space-y-6 relative z-10 border-t border-white/50 md:border-none pb-[max(20px,env(safe-area-inset-bottom))]">
+            <div class="w-10 h-1.5 bg-slate-300 rounded-full mx-auto md:hidden mb-2"></div>
+            
+            <div class="text-center space-y-1">
+                <h2 class="text-lg font-bold text-slate-900">系统设置</h2>
+                <p class="text-xs text-slate-500">连接您的 Worker 后端</p>
+            </div>
+
             <div class="space-y-4">
-                <div class="space-y-1">
-                    <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold ml-1">Worker
-                        服务地址</label>
-                    <input id="setApi" type="text" placeholder="https://..."
-                        class="w-full bg-slate-900/50 border border-slate-700 p-4 rounded-2xl outline-none focus:ring-2 ring-blue-500/50 text-sm transition-all">
+                <div class="space-y-1.5">
+                    <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">API Endpoint</label>
+                    <input id="setApi" type="url" placeholder="https://..." 
+                        class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium">
                 </div>
-                <div class="space-y-1">
-                    <label class="text-[10px] uppercase tracking-widest text-slate-400 font-bold ml-1">管理员密钥</label>
-                    <input id="setKey" type="password" placeholder="••••••••"
-                        class="w-full bg-slate-900/50 border border-slate-700 p-4 rounded-2xl outline-none focus:ring-2 ring-blue-500/50 text-sm transition-all">
+                <div class="space-y-1.5">
+                    <label class="text-[11px] uppercase tracking-wider text-slate-400 font-bold ml-1">Admin Key</label>
+                    <input id="setKey" type="password" placeholder="••••••••" 
+                        class="w-full bg-white border border-slate-200 p-4 rounded-xl outline-none input-ios text-slate-700 font-medium">
                 </div>
             </div>
-            <div class="flex gap-3">
-                <button onclick="closeSettings()"
-                    class="flex-1 py-4 text-slate-400 font-semibold rounded-2xl hover:bg-slate-800 transition">取消</button>
-                <button onclick="saveSettings()"
-                    class="flex-1 py-4 gradient-btn text-white font-bold rounded-2xl">保存</button>
-            </div>
-            <div class="text-center pt-2">
-                <a href="https://www.youtube.com/@sanshicao" target="_blank"
-                    class="text-[10px] text-slate-600 hover:text-slate-400 font-bold tracking-widest uppercase">YouTube
-                    @三十槽</a>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="closeSettings()" class="py-3.5 bg-slate-200/80 text-slate-600 font-bold rounded-xl btn-ios text-sm">取消</button>
+                <button onclick="saveSettings()" class="py-3.5 bg-[#007AFF] text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 btn-ios text-sm">保存</button>
             </div>
         </div>
     </div>
 
     <script>
+        // --- 核心逻辑 (安全加密保持不变) ---
         const urlParams = new URLSearchParams(window.location.search);
-        let apiFromUrl = urlParams.get('api');
-        const cfgFromUrl = urlParams.get('cfg');
-        if (cfgFromUrl) { try { apiFromUrl = atob(cfgFromUrl); } catch (e) { } }
         const shareId = urlParams.get('share');
-
-        let API_URL = apiFromUrl || localStorage.getItem('cf_notes_api') || "";
+        
+        let API_URL = localStorage.getItem('cf_notes_api') || "";
         let ADMIN_KEY = localStorage.getItem('cf_notes_key') || "";
 
         const app = document.getElementById('app');
 
-        // 加解密逻辑
-        async function getK(pw) {
+        // PBKDF2 + AES-GCM Encryption
+        async function getK(pw, salt) {
             const enc = new TextEncoder();
-            const hash = await crypto.subtle.digest('SHA-256', enc.encode(pw));
-            return await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+            const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pw), { name: "PBKDF2" }, false, ["deriveKey"]);
+            return await crypto.subtle.deriveKey({ name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" }, keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
         }
+
         async function encrypt(text, pw) {
-            const enc = new TextEncoder(); const iv = crypto.getRandomValues(new Uint8Array(12)); const key = await getK(pw);
+            const enc = new TextEncoder();
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await getK(pw, salt);
             const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
-            return btoa(JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipher)) }));
+            return btoa(JSON.stringify({ iv: Array.from(iv), salt: Array.from(salt), data: Array.from(new Uint8Array(cipher)) }));
         }
+
         async function decrypt(json, pw) {
             try {
-                const { iv, data } = JSON.parse(atob(json)); const key = await getK(pw);
-                const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(iv) }, key, new Uint8Array(data));
+                const parsed = JSON.parse(atob(json));
+                if (!parsed.salt) throw new Error("Legacy");
+                const iv = new Uint8Array(parsed.iv);
+                const salt = new Uint8Array(parsed.salt);
+                const data = new Uint8Array(parsed.data);
+                const key = await getK(pw, salt);
+                const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
                 return new TextDecoder().decode(dec);
             } catch (e) { return null; }
         }
+
+        // --- 移动端优化视图 ---
 
         function init() {
             if (shareId) renderShareView();
@@ -126,78 +182,109 @@
 
         function renderWelcomeView() {
             app.innerHTML = `
-            <div class="glass p-12 rounded-[3rem] text-center space-y-8 animate-in fade-in zoom-in duration-700">
-                <div class="inline-flex p-5 bg-blue-500/10 rounded-full text-5xl">🛡️</div>
-                <div class="space-y-2">
-                    <h1 class="text-4xl font-extrabold tracking-tight italic">CloudNotes</h1>
-                    <p class="text-slate-400 leading-relaxed">您的专属分布式加密笔记系统<br>请先关联您的 Cloudflare Worker 后端</p>
+            <div class="min-h-[80vh] flex flex-col justify-center items-center text-center animate-in fade-in duration-700 px-4">
+                <div class="glass-panel p-8 md:p-12 rounded-[2rem] w-full max-w-sm space-y-8 shadow-xl border-white/70">
+                    <div class="w-16 h-16 bg-gradient-to-b from-blue-500 to-blue-600 rounded-2xl mx-auto shadow-lg shadow-blue-500/30 flex items-center justify-center text-3xl text-white">
+                        🔐
+                    </div>
+                    <div class="space-y-3">
+                        <h1 class="text-2xl font-bold text-slate-900">CloudNotes</h1>
+                        <p class="text-slate-500 text-sm leading-relaxed">
+                            端到端加密笔记<br>数据仅在您的设备上解密
+                        </p>
+                    </div>
+                    <button onclick="configUrl()" class="w-full py-4 bg-[#007AFF] text-white font-bold rounded-2xl shadow-xl shadow-blue-500/25 btn-ios">
+                        开始配置
+                    </button>
                 </div>
-                <button onclick="configUrl()" class="px-10 py-5 gradient-btn text-white font-black rounded-3xl shadow-2xl">初始化配置</button>
+                <p class="mt-8 text-[10px] text-slate-400 font-medium uppercase tracking-widest">Secure Local Encryption</p>
             </div>
         `;
         }
 
         function renderMainView() {
             app.innerHTML = `
-            <div class="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <header class="flex justify-between items-end">
-                    <div class="space-y-1">
-                        <h1 class="text-4xl font-extrabold tracking-tighter bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">CloudNotes</h1>
-                        <p class="text-[10px] uppercase tracking-[0.3em] text-blue-500 font-black">端到端加密保险库</p>
+            <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <header class="flex justify-between items-center pt-2 sticky top-0 z-20 mix-blend-hard-light">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">我的笔记</h1>
+                        <p class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Encrypted Vault</p>
                     </div>
-                    <button onclick="configUrl()" class="p-4 glass rounded-2xl hover:rotate-180 transition-all duration-500 text-xl">⚙️</button>
+                    <button onclick="configUrl()" class="w-10 h-10 rounded-full bg-white/80 backdrop-blur text-slate-500 shadow-sm border border-white flex items-center justify-center btn-ios">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
                 </header>
 
-                <main class="glass p-8 rounded-[2.5rem] shadow-2xl space-y-6 border-white/5">
-                    <input id="mainPw" type="password" placeholder="设置解密主密码 (Passkey)" class="w-full bg-slate-950/50 border border-slate-800 p-5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50 transition-all font-mono">
-                    <textarea id="noteInput" placeholder="在此输入私人内容..." class="w-full bg-slate-950/50 border border-slate-800 p-5 h-48 rounded-2xl outline-none focus:bg-slate-950 transition-all resize-none leading-relaxed"></textarea>
-                    <div class="grid grid-cols-2 gap-4">
-                        <button onclick="doSave()" class="gradient-btn text-white py-5 rounded-2xl font-black tracking-widest uppercase text-xs">加密存入云端</button>
-                        <button onclick="doAI()" class="glass text-purple-400 py-5 rounded-2xl font-black tracking-widest uppercase text-xs hover:bg-purple-500/10 transition border-purple-500/20">✨ AI 智能总结</button>
+                <main class="glass-panel p-5 rounded-[1.8rem] space-y-4 shadow-sm">
+                    <input id="mainPw" type="password" placeholder="输入主密钥 (Passkey)" autocomplete="current-password"
+                        class="w-full bg-white/60 border border-white p-4 rounded-xl outline-none input-ios text-slate-800 placeholder:text-slate-400">
+                    
+                    <textarea id="noteInput" placeholder="输入内容..." 
+                        class="w-full bg-white/60 border border-white p-4 h-36 rounded-xl outline-none input-ios resize-none text-slate-800 leading-relaxed placeholder:text-slate-400"></textarea>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="doSave()" class="bg-slate-900 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 btn-ios flex items-center justify-center gap-2">
+                            <span>🔒</span> 加密存储
+                        </button>
+                        <button onclick="doAI()" class="bg-white text-indigo-600 border border-indigo-100 py-4 rounded-xl font-bold text-sm btn-ios flex items-center justify-center gap-2">
+                            <span>✨</span> AI 总结
+                        </button>
                     </div>
                 </main>
 
-                <section class="space-y-6">
-                    <div class="flex justify-between items-center px-4">
-                        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 italic">Vault / 我的加密库</h2>
-                        <button onclick="loadList()" class="text-blue-500 text-xs font-black hover:underline uppercase">刷新列表</button>
+                <section class="space-y-4 pt-2">
+                    <div class="flex justify-between items-center px-2">
+                        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">Notes Vault</h2>
+                        <button onclick="loadList()" class="bg-blue-50 px-3 py-1.5 rounded-lg text-[#007AFF] text-xs font-bold btn-ios">刷新列表</button>
                     </div>
-                    <div id="notesList" class="space-y-4">
-                        <div class="text-center py-20 text-slate-600 italic text-sm">配置暗号并填入密码后点击刷新。</div>
+                    <div id="notesList" class="grid gap-3 pb-8">
+                        <div class="text-center py-12">
+                            <div class="inline-block p-4 rounded-full bg-white/50 mb-2 text-2xl">☁️</div>
+                            <p class="text-slate-400 text-sm">输入密钥后刷新查看</p>
+                        </div>
                     </div>
                 </section>
-                <footer class="text-center pt-8 pb-4 opacity-50 hover:opacity-100 transition duration-500">
-                     <a href="https://www.youtube.com/@sanshicao" target="_blank" class="text-[10px] text-slate-500 font-bold hover:text-blue-400 uppercase tracking-widest transition">Built by 三十槽 | YouTube</a>
-                </footer>
             </div>
         `;
         }
 
         function renderShareView() {
             app.innerHTML = `
-            <div class="glass p-12 rounded-[3rem] shadow-2xl text-center space-y-8 animate-in zoom-in duration-500">
-                <div class="text-6xl animate-bounce">🔥</div>
-                <div class="space-y-2">
-                    <h1 class="text-3xl font-black italic">阅后即焚解密</h1>
-                    <p class="text-slate-400 text-sm">解密后数据将立即从服务器物理擦除</p>
-                </div>
-                <input id="sharePw" type="password" placeholder="请输入 6 位以上解密密码" class="w-full bg-slate-950/50 border border-slate-800 p-5 rounded-2xl outline-none focus:ring-2 ring-orange-500/50 text-center font-mono">
-                <button id="unlockBtn" onclick="doUnlockShare()" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] transition">解密并销毁</button>
-                <div id="shareResult" class="mt-8 text-left p-6 bg-slate-950/50 rounded-2xl hidden whitespace-pre-wrap text-sm leading-relaxed border border-orange-500/20 ring-1 ring-orange-500/10 shadow-inner italic text-slate-300"></div>
-                <div class="pt-8 border-t border-white/5">
-                    <a href="https://www.youtube.com/@sanshicao" target="_blank" class="text-xs font-black uppercase tracking-widest text-red-500 hover:text-red-400 transition underline underline-offset-4">🎬 关注 YouTube @三十槽 学习搭建</a>
+            <div class="min-h-[80vh] flex flex-col justify-center px-2">
+                <div class="glass-panel p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center space-y-6 animate-in zoom-in duration-500">
+                    <div class="w-20 h-20 bg-orange-500 rounded-full mx-auto flex items-center justify-center text-4xl shadow-lg shadow-orange-500/30">🔥</div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">阅后即焚</h1>
+                        <p class="text-slate-500 text-sm mt-1">数据将在解密后立即物理销毁</p>
+                    </div>
+                    
+                    <input id="sharePw" type="password" placeholder="输入解密密码" inputmode="numeric"
+                        class="w-full bg-white p-4 rounded-2xl outline-none text-center font-bold text-lg border border-slate-100 input-ios">
+
+                    <button id="unlockBtn" onclick="doUnlockShare()" class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-500/20 btn-ios text-lg">
+                        立即解密
+                    </button>
+                    
+                    <div id="shareResult" class="mt-6 text-left p-5 bg-slate-50 rounded-2xl hidden whitespace-pre-wrap text-sm leading-relaxed border border-slate-200 text-slate-700 font-mono break-words"></div>
                 </div>
             </div>
         `;
         }
 
-        /* --- 功能逻辑 --- */
+        /* --- 功能实现 --- */
+        
         function configUrl() {
-            document.getElementById('settingsModal').classList.remove('hidden');
-            document.getElementById('setApi').value = API_URL;
-            document.getElementById('setKey').value = ADMIN_KEY;
+            const modal = document.getElementById('settingsModal');
+            modal.classList.remove('hidden');
+            // 小延迟让 CSS transition 生效
+            setTimeout(() => {
+                document.getElementById('setApi').value = API_URL;
+                document.getElementById('setKey').value = ADMIN_KEY;
+            }, 10);
         }
-        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+        function closeSettings() { 
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
         function saveSettings() {
             localStorage.setItem('cf_notes_api', document.getElementById('setApi').value);
             localStorage.setItem('cf_notes_key', document.getElementById('setKey').value);
@@ -205,7 +292,8 @@
         }
 
         async function doSave() {
-            const text = document.getElementById('noteInput').value; const pw = document.getElementById('mainPw').value;
+            const text = document.getElementById('noteInput').value;
+            const pw = document.getElementById('mainPw').value;
             if (!text || !pw) return alert("请填写内容和密码");
             try {
                 const cipher = await encrypt(text, pw);
@@ -213,37 +301,74 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
                     body: JSON.stringify({ content: cipher })
                 });
-                if (res.ok) { alert("✅ 已存入安全库"); document.getElementById('noteInput').value = ""; loadList(); }
-                else alert("❌ 暗号错误");
-            } catch (e) { alert("❌ 网络连接失败"); }
+                if (res.ok) { 
+                    alert("✅ 已加密存入"); 
+                    document.getElementById('noteInput').value = ""; 
+                    loadList(); 
+                } else { alert("❌ 保存失败：密钥或网络错误"); }
+            } catch (e) { alert("❌ 网络异常"); }
         }
 
         async function loadList() {
-            const pw = document.getElementById('mainPw').value; if (!pw) return alert("请输入密码解密");
+            const pw = document.getElementById('mainPw').value;
+            if (!pw) return alert("请输入主密钥以解密保险库");
             const listDiv = document.getElementById('notesList');
+            listDiv.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm animate-pulse">正在同步数据...</div>';
+            
             try {
                 const res = await fetch(`${API_URL}/api/list`, { headers: { 'Authorization': ADMIN_KEY } });
-                const notes = await res.json(); listDiv.innerHTML = "";
-                if (notes.length === 0) listDiv.innerHTML = '<div class="text-center py-20 text-slate-700 italic text-sm">暂无数据</div>';
+                const notes = await res.json(); 
+                listDiv.innerHTML = "";
+                
+                if (notes.length === 0) listDiv.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm">暂无加密笔记</div>';
+                
                 for (let n of notes) {
-                    const clearText = await decrypt(n.content, pw) || "🔒 [加密数据 / 密码不匹配]";
+                    const clearText = await decrypt(n.content, pw);
+                    const displayText = clearText || "🔒 解密失败：密码错误";
+                    const isError = !clearText;
+
                     const card = document.createElement('div');
-                    card.className = "note-card glass p-6 rounded-3xl space-y-4 border border-white/5 shadow-lg group";
-                    card.innerHTML = `
-                    <div class="flex justify-between text-[9px] font-black text-slate-500 tracking-widest uppercase italic">
-                        <span>索引编号 #${n.id}</span>
-                        <span>${new Date(n.created_at).toLocaleString()}</span>
-                    </div>
-                    <div class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">${clearText}</div>
-                    <div class="pt-4 border-t border-white/5 flex flex-wrap gap-6 items-center">
-                        <button onclick="doShareCopy('${n.content}')" class="text-xs font-black text-blue-400 uppercase tracking-widest hover:text-blue-300 transition">📤 生成阅后即焚链接</button>
-                        <button onclick="doExport(\`${clearText.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, ${n.id})" class="text-xs font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition">💾 导出备份</button>
-                        <button onclick="doDelete(${n.id})" class="text-xs font-black text-rose-500 uppercase tracking-widest ml-auto opacity-40 group-hover:opacity-100 transition">🗑️ 删除</button>
-                    </div>
-                `;
+                    card.className = "bg-white p-5 rounded-[1.2rem] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden";
+                    
+                    // Card Header
+                    const headerHtml = `
+                        <div class="flex justify-between items-center opacity-60">
+                            <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">#${n.id}</span>
+                            <span class="text-[10px] font-medium text-slate-400">${new Date(n.created_at).toLocaleDateString()} ${new Date(n.created_at).toLocaleTimeString().slice(0,5)}</span>
+                        </div>
+                    `;
+                    
+                    // Content
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = `text-sm leading-relaxed whitespace-pre-wrap break-words ${isError ? 'text-red-500' : 'text-slate-700'}`;
+                    contentDiv.textContent = displayText;
+
+                    // Footer Buttons (增大触控区域)
+                    const footerHtml = `
+                        <div class="pt-3 border-t border-slate-50 flex items-center justify-between gap-2 mt-auto">
+                            <button onclick="doShareCopy('${n.content}')" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-100 transition">
+                                📤 分享
+                            </button>
+                            <button class="export-btn flex-1 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-100 transition">
+                                💾 备份
+                            </button>
+                            <button onclick="doDelete(${n.id})" class="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:bg-red-100 transition">
+                                🗑️ 删除
+                            </button>
+                        </div>
+                    `;
+
+                    card.innerHTML = headerHtml;
+                    card.appendChild(contentDiv);
+                    card.insertAdjacentHTML('beforeend', footerHtml);
+                    
+                    card.querySelector('.export-btn').onclick = () => doExport(displayText, n.id);
                     listDiv.appendChild(card);
                 }
-            } catch (e) { alert("拉取失败"); }
+            } catch (e) { 
+                console.error(e);
+                listDiv.innerHTML = '<div class="text-center py-8 text-red-400 text-sm">连接失败，请检查配置</div>';
+            }
         }
 
         async function doShareCopy(cipher) {
@@ -253,20 +378,26 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
                     body: JSON.stringify({ content: cipher, public_id: pid, is_share: 1 })
                 });
-                const fullUrl = `${window.location.origin}${window.location.pathname}?share=${pid}&cfg=${btoa(API_URL)}`;
-                prompt("✅ 阅后即焚加密链接已生成：", fullUrl);
-            } catch (e) { alert("分享失败"); }
+                const fullUrl = `${window.location.origin}${window.location.pathname}?share=${pid}`;
+                // 使用 Clipboard API 尝试复制，如果不行则 Prompt
+                if (navigator.share) {
+                    navigator.share({ title: '阅后即焚链接', url: fullUrl }).catch(() => prompt("链接：", fullUrl));
+                } else {
+                    prompt("🔥 阅后即焚链接：", fullUrl);
+                }
+            } catch (e) { alert("生成失败"); }
         }
 
         function doExport(text, id) {
             const date = new Date().toISOString().split('T')[0];
             const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `CloudNote_${id}_${date}.txt`; a.click();
+            const a = document.createElement('a'); a.href = url;
+            a.download = `Note_${id}.txt`; a.click();
         }
 
         async function doDelete(id) {
-            if (!confirm("确定要物理抹除这条记录吗？")) return;
+            if (!confirm("⚠️ 确定永久删除？")) return;
             await fetch(`${API_URL}/api/delete`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
                 body: JSON.stringify({ id: id })
@@ -275,37 +406,47 @@
         }
 
         async function doAI() {
-            const text = document.getElementById('noteInput').value; if (!text) return alert("笔记为空");
-            const btn = event.target; btn.innerText = "思考中..."; btn.disabled = true;
+            const text = document.getElementById('noteInput').value;
+            if (!text) return alert("笔记为空");
+            if(!confirm("⚠️ 隐私警告：\nAI 总结需将前 1000 字符【明文】发送至服务器。是否继续？")) return;
+
+            const btn = event.target; 
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = `<span class="animate-spin inline-block">⏳</span>`; btn.disabled = true;
+            
             try {
                 const res = await fetch(`${API_URL}/api/ai-sum`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_KEY },
                     body: JSON.stringify({ text: text.substring(0, 1000) })
                 });
                 const data = await res.json();
-                document.getElementById('noteInput').value += `\n\n--- ✨ AI SUMMARY ---\n${data.summary}`;
-            } finally { btn.innerText = "✨ AI 智能总结"; btn.disabled = false; }
+                document.getElementById('noteInput').value += `\n\n--- AI 摘要 ---\n${data.summary}`;
+            } catch(e) { alert("AI 服务出错"); } 
+            finally { btn.innerHTML = oldHtml; btn.disabled = false; }
         }
 
         async function doUnlockShare() {
-            const pw = document.getElementById('sharePw').value; const resDiv = document.getElementById('shareResult');
+            const pw = document.getElementById('sharePw').value;
+            const resDiv = document.getElementById('shareResult');
+            const btn = document.getElementById('unlockBtn');
             try {
                 const res = await fetch(`${API_URL}/api/share/${shareId}`);
-                if (!res.ok) return alert("失效或已被焚毁");
-                const data = await res.json(); const clearText = await decrypt(data.content, pw);
-                if (clearText) { resDiv.innerText = clearText; resDiv.classList.remove('hidden'); document.getElementById('unlockBtn').disabled = true; document.getElementById('unlockBtn').innerText = "数据已销毁"; }
-                else alert("密码错误");
-            } catch (e) { alert("网络异常"); }
+                if (!res.ok) return alert("链接已失效");
+                const data = await res.json(); 
+                const clearText = await decrypt(data.content, pw);
+                if (clearText) { 
+                    resDiv.textContent = clearText; 
+                    resDiv.classList.remove('hidden'); 
+                    btn.disabled = true; btn.className = "w-full bg-slate-200 text-slate-400 py-4 rounded-2xl font-bold"; btn.innerText = "数据已销毁";
+                } else alert("密码错误");
+            } catch (e) { alert("网络错误"); }
         }
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log('Service Worker Registered'))
-                .catch(err => console.error('Service Worker Registration Failed', err));
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
         }
 
         init();
     </script>
 </body>
-
 </html>
